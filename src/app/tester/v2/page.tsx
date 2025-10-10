@@ -10,11 +10,12 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 
 interface GameState {
 	gameOver: boolean;
+	movesMade: number;
 	winner: Color | null;
 }
 export default function TesterV2() {
 	const [games, setGames] = useState(0);
-	const [numGamesInput, setNumGamesInput] = useState(games);
+	const [numGamesInput, setNumGamesInput] = useState(100);
 	const [currentlyRunning, setCurrentlyRunning] = useState(false);
 
 	const [chessPositions, setChessPositions] = useState<Board[]>([]);
@@ -32,7 +33,7 @@ export default function TesterV2() {
 		const initializedBoards: Board[] = [];
 
 		for (let i = 0; i < games; i++) {
-			initializedStates.push({ gameOver: false, winner: null });
+			initializedStates.push({ gameOver: false, winner: null, movesMade: 0 });
 			initializedBoards.push(new Chess(8, 8).generateBoard(standardChessSetup).getBoard());
 		}
 
@@ -43,7 +44,7 @@ export default function TesterV2() {
 		initializedBoards.forEach((board, i) => {
 			const worker = new Worker(new URL('@/app/worker/chessWorker.js', import.meta.url));
 			worker.onmessage = (e) => {
-				const {board: updatedBoard, winner, gameOver} = e.data;
+				const {board: updatedBoard, winner, gameOver, movesMade} = e.data;
 
 				// Update board
 				setChessPositions((prev) => {
@@ -55,7 +56,7 @@ export default function TesterV2() {
 				// Update game state
 				setGameStates((prev) => {
 					const newStates = [...prev];
-					newStates[i] = {gameOver, winner};
+					newStates[i] = {gameOver, winner, movesMade};
 					return newStates;
 				});
 
@@ -106,6 +107,21 @@ export default function TesterV2() {
 					return accum;
 				}, 0) / completed.current
 			).toFixed(2);
+
+	const avgMovesMade =
+		completed.current === 0
+			? "--"
+			: (
+				(
+					gameStates.reduce((accum, state) => {
+						if (state.gameOver) {
+							console.log(state.movesMade);
+							return accum + state.movesMade;
+						}
+						return accum;
+					}, 0) / completed.current
+				).toFixed(2)
+			)
 
 	const parentRef = useRef(null)
 
@@ -162,26 +178,20 @@ export default function TesterV2() {
 				</div>
 				<div className="flex flex-row gap-2 items-center">
 					<label className="font-bold">Cell size:</label>
-					<input
+					<select
 						className="font-mono border border-white"
-						type="number"
-						value={cellSize === 0 ? "" : cellSize}
+						value={cellSize}
 						onChange={(e) => {
-							const value = e.target.value;
-
-							// Allow empty input
-							if (value === "") {
-								setCellSize(0);
-								return;
-							}
-
-							let num = parseInt(value);
-							if (isNaN(num)) return;
-
-							num = Math.min(Math.max(num, 1), 96);
-							setCellSize(num);
+							const value = parseInt(e.target.value, 10);
+							setCellSize(value);
 						}}
-					/>
+					>
+						<option value={16}>16</option>
+						<option value={32}>32</option>
+						<option value={64}>64</option>
+						<option value={72}>72</option>
+						<option value={96}>96</option>
+					</select>
 				</div>
 				<div className="flex flex-row gap-2 items-center">
 					<label className="font-bold">Think time:</label>
@@ -245,6 +255,11 @@ export default function TesterV2() {
 					<label className="font-bold">Average pieces left:</label>
 					<p>{avgPiecesLeft}</p>
 				</div>
+
+				<div className="flex flex-row gap-2 items-center">
+					<label className="font-bold">Average moves till win:</label>
+					<p>{avgMovesMade}</p>
+				</div>
 			</div>
 
 			<div ref={parentRef} className="h-full overflow-auto px-24 py-24">
@@ -286,14 +301,14 @@ export default function TesterV2() {
 															color: gameStates[idx].winner === "W" ? "#000" : "#fff",
 															background: gameStates[idx].winner === "W" ? "#fff" : "#000",
 														}}
-													>{gameStates[idx].winner === "W" ? "White" : "Black"} win</div>
+													>{gameStates[idx].winner === "W" ? "White" : "Black"} win (in {gameStates[idx].movesMade} moves)</div>
 												) : null
 											}
 											<ChessboardDisplay
 												squareDim={cellSize}
 												chessboard={board}
-												onMove={(move: Move) => {
-												}}
+												onMove={(_: Move) => {}}
+												getHighlights={() => []}
 												displayCoordinates={false}
 											/>
 										</div>

@@ -1,5 +1,12 @@
 import {Board, Move, MoveHistoryEntry, Piece} from "@/app/utils";
 import {Color} from "./utils";
+import {
+	validateBishopMove,
+	validateKingMove,
+	validateKnightMove,
+	validatePawnMove,
+	validateRookMove
+} from "@/app/validators";
 
 export class Chess {
 	private board: Board;
@@ -30,20 +37,25 @@ export class Chess {
 	getBoard() {
 		return this.board.map(row => row.slice());
 	}
+
 	getSquare(row: number, col: number): Piece | null {
 		if (row < 0 || row >= this.numRanks || col < 0 || col >= this.numFiles) return null;
 
 		return this.board[row][col];
 	}
+
 	getRanks(): number {
 		return this.numRanks;
 	}
+
 	getFiles(): number {
 		return this.numFiles;
 	}
-	getMoveHistory() {
+
+	getHistory() {
 		return [...this.moveHistory];
 	}
+
 	getTurn(): Color {
 		return this.currentTurn;
 	}
@@ -54,6 +66,7 @@ export class Chess {
 
 		return this;
 	}
+
 	setSquare(row: number, col: number, piece: Piece | null): Chess {
 		if (row < 0 || row >= this.numRanks || col < 0 || col >= this.numFiles) return this;
 
@@ -69,7 +82,7 @@ export class Chess {
 	 * @returns A boolean indicating whether the move was successful.
 	 */
 	move(move: Move): boolean {
-		const { fromRow, fromCol, toRow, toCol } = move;
+		const {fromRow, fromCol, toRow, toCol} = move;
 
 		if (
 			fromRow == toRow && fromCol == toCol ||
@@ -78,17 +91,93 @@ export class Chess {
 			this.getSquare(fromRow, fromCol) === null
 		) return false;
 
-		const piece = this.getSquare(fromRow, fromCol)!;
-		if (piece.color !== this.currentTurn) return false;
+		const movingPiece = this.getSquare(fromRow, fromCol)!;
+		if (movingPiece.color !== this.currentTurn) return false; // Incorrect turn
 
-		if (this.getSquare(toRow, toCol)?.color === this.currentTurn) return false; // Can't capture own piece
+		const moveValidation = this.validateMove(move);
+		if (!moveValidation.valid) return false; // Invalid move for piece
 
-		this.setSquare(toRow, toCol, piece);
+		// Make the move
+		if (moveValidation.isEnPassant) {
+			const epRow = movingPiece.color === "W" ? toRow + 1 : toRow - 1;
+			this.setSquare(epRow, toCol, null); // Remove the captured pawn
+		}
+		this.setSquare(toRow, toCol, movingPiece);
 		this.setSquare(fromRow, fromCol, null);
 
-		this.moveHistory.push({ move: move, piece });
+		this.moveHistory.push({move: move, piece: movingPiece});
+
 
 		return true;
+	}
+
+	getAllValidMoves(color: Color): Move[] {
+		const allMoves: Move[] = [];
+		for (let r = 0; r < this.numRanks; r++) {
+			for (let c = 0; c < this.numFiles; c++) {
+				const piece = this.getSquare(r, c);
+				if (piece && piece.color === color) {
+					const pieceMoves = this.getValidMoves(r, c);
+					allMoves.push(...pieceMoves);
+				}
+			}
+		}
+		return allMoves;
+	}
+
+	getValidMoves(row: number, col: number): Move[] {
+		const piece = this.getSquare(row, col);
+		if (!piece) return [];
+
+		const possibleMoves: Move[] = [];
+		for (let r = 0; r < this.numRanks; r++) {
+			for (let c = 0; c < this.numFiles; c++) {
+				if (r === row && c === col) continue; // Skip the square the piece is on
+
+				const move: Move = { fromRow: row, fromCol: col, toRow: r, toCol: c };
+				const validation = this.validateMove(move);
+				if (validation.valid) {
+					possibleMoves.push(move);
+				}
+			}
+		}
+
+		return possibleMoves;
+	}
+
+	validateMove(move: Move): {
+		valid: boolean;
+		isEnPassant?: boolean;
+	} {
+		const {fromRow, fromCol, toRow, toCol} = move;
+		const movingPiece = this.getSquare(fromRow, fromCol);
+		if (!movingPiece) return { valid: false }; // No piece to move
+
+		if (this.getSquare(toRow, toCol)?.color === this.getTurn()) return { valid: false }; // No cannibalism...
+		// I'm pretty sure ^^ is already checked in the individual piece validators but whatever
+
+		const validatorCtx = {
+			board: this.board,
+			moveHistory: this.moveHistory,
+			numRanks: this.numRanks
+		}
+
+		switch (movingPiece.name) {
+			case "Pawn":
+				return validatePawnMove(move, movingPiece.color, validatorCtx);
+			case "Rook":
+				return validateRookMove(move, movingPiece.color, validatorCtx);
+			case "Bishop":
+				return validateBishopMove(move, movingPiece.color, validatorCtx);
+			case "Knight":
+				return validateKnightMove(move, movingPiece.color, validatorCtx);
+			case "King":
+				return validateKingMove(move, movingPiece.color, validatorCtx);
+			case "Queen":
+				return (validateRookMove(move, movingPiece.color, validatorCtx).valid || validateBishopMove(move, movingPiece.color, validatorCtx).valid) ? { valid: true } : { valid: false };
+			default:
+				return { valid: true };
+		}
 	}
 
 	countPoints(color: string): number {

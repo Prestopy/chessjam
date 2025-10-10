@@ -3,7 +3,7 @@ import {useDrag, useDrop} from "react-dnd";
 import {useEffect} from "react";
 import {pieceSymbols} from "@/app/utils";
 
-export default function Square({ movePieceHere, row, col, squareDim, white, piece, setIsMouseDown }: { movePieceHere: (row: number, col: number) => void, row: number, col: number, squareDim: number, white: boolean, piece: Piece | null, setIsMouseDown: (isDown: boolean) => void }) {
+export default function Square({ movePieceHere, row, col, squareDim, white, piece, setIsMouseDown, onDrag, highlight }: { movePieceHere: (row: number, col: number) => void, row: number, col: number, squareDim: number, white: boolean, piece: Piece | null, setIsMouseDown: (isDown: boolean) => void, onDrag: () => void, highlight: "none" | "possible" | "danger" }) {
 	const WHITE = "#f0d9b5";
 	const BLACK = "#b58863";
 
@@ -38,11 +38,15 @@ export default function Square({ movePieceHere, row, col, squareDim, white, piec
 
 	useEffect(() => {
 		setIsMouseDown(isDragging);
+		onDrag();
 	}, [isDragging])
 
 	return (
 		<div ref={(node) => {drop(drag(node))}} style={squareStyle}>
-			<div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: isOver ? 'yellow' : 'transparent', opacity: isDragging || isOver ? 0.25 : 1, cursor: 'move' }}>
+			<div className="w-full h-full flex items-center justify-center" style={{
+				backgroundColor: highlight === "danger" ? "rgba(181,0,0,0.75)" : highlight === "possible" ? 'rgba(255,244,0,0.25)' :  "transparent", opacity: isDragging ? 0.25 : 1, cursor: "move",
+				boxShadow: isOver ? (highlight !== "none" ? "inset 0 0 0 4px rgb(0, 255, 255)" : "inset 0 0 0 4px rgb(255, 0, 0)") : "none"
+			}}>
 				{
 					piece === null ? null : <img width={squareDim-10} src={pieceSymbols[piece.name][piece.color]} />
 				}

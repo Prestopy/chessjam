@@ -5,9 +5,11 @@ import {HTML5Backend} from 'react-dnd-html5-backend'
 import React, {useState} from "react";
 import {Board, Move} from "@/app/utils";
 
-export default function ChessboardDisplay({ squareDim, chessboard, onMove, displayCoordinates }: { squareDim: number, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean }) {
+export default function ChessboardDisplay({ squareDim, chessboard, onMove, displayCoordinates, getHighlights }: { squareDim: number, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (r: number, c: number) => {row: number, col: number}[] }) {
 	const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
 	const [isMouseDown, setIsMouseDown] = useState(false);
+
+	const [highlights, setHighlights] = useState<{ row: number; col: number }[]>([]);
 
 	return (
 		<DndProvider backend={HTML5Backend}>
@@ -39,6 +41,11 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 											white={isWhiteSquare}
 											piece={piece}
 											setIsMouseDown={setIsMouseDown}
+											onDrag={() => {
+												const newHighlights = getHighlights(rowIndex, colIndex);
+												setHighlights(newHighlights);
+											}}
+									        highlight={highlights.some(h => h.row === rowIndex && h.col === colIndex) ? (piece === null ? "possible" : "danger") : "none"}
 										/>
 									</div>
 								})

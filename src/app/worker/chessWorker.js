@@ -23,22 +23,22 @@ self.onmessage = function (e) {
 
 		if (pieces.length === 0) {
 			gameOver = true;
-			self.postMessage({board: game.getBoard(), winner: null, gameOver: true});
+			self.postMessage({board: game.getBoard(), winner: null, gameOver: true, movesMade: game.getHistory().length});
 			clearInterval(loop);
 			return;
 		}
 
-		let success = false;
-		while (!success) {
-			const randomPiece = pieces[Math.floor(Math.random() * pieces.length)];
-			const move = {
-				fromRow: randomPiece.position.row,
-				fromCol: randomPiece.position.col,
-				toRow: Math.floor(Math.random() * game.getRanks()),
-				toCol: Math.floor(Math.random() * game.getFiles()),
-			};
-			success = game.move(move);
+		const allMoves = game.getAllValidMoves(game.getTurn());
+		if (allMoves.length === 0) {
+			gameOver = true;
+			winner = game.getTurn() === "white" ? "black" : "white";
+			self.postMessage({board: game.getBoard(), winner, gameOver: true, movesMade: game.getHistory().length});
+			clearInterval(loop);
+			return;
 		}
+
+		const randomMove = allMoves[Math.floor(Math.random() * allMoves.length)];
+		game.move(randomMove);
 
 		if (
 			!game
@@ -48,12 +48,12 @@ self.onmessage = function (e) {
 		) {
 			gameOver = true;
 			winner = game.getTurn();
-			self.postMessage({board: game.getBoard(), winner, gameOver: true});
+			self.postMessage({board: game.getBoard(), winner, gameOver: true, movesMade: game.getHistory().length});
 			clearInterval(loop);
 			return;
 		}
 
 		game.nextTurn();
-		self.postMessage({board: game.getBoard(), winner, gameOver: false});
+		self.postMessage({board: game.getBoard(), winner, gameOver: false, movesMade: game.getHistory().length});
 	}, thinkTime);
 };
