@@ -24,6 +24,7 @@ export default function ProgressBar({
                                     }: ProgressBarProps) {
 	return (
 		<div
+			className="select-none"
 			style={{
 				width: width + "px",
 				background,

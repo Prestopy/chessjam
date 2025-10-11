@@ -2,14 +2,15 @@
 import { useEffect, useRef, useState } from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import { Chess } from "@/app/Chess";
-import { Board, Move, standardChessSetup } from "@/app/utils";
+import {Board, GameState, standardChessSetup} from "@/app/utils";
 import { Color } from "@/app/utils";
 import ProgressBar from "@/app/Components/ProgressBar";
 
 import { useVirtualizer } from '@tanstack/react-virtual';
+import {Move} from "@/app/Move";
 
-interface GameState {
-	gameOver: boolean;
+interface GameData {
+	gameState: GameState;
 	movesMade: number;
 	winner: Color | null;
 }
@@ -19,21 +20,21 @@ export default function TesterV2() {
 	const [currentlyRunning, setCurrentlyRunning] = useState(false);
 
 	const [chessPositions, setChessPositions] = useState<Board[]>([]);
-	const [gameStates, setGameStates] = useState<GameState[]>([]);
+	const [gameStates, setGameStates] = useState<GameData[]>([]);
 	const workerRefs = useRef<Worker[]>([]);
 
-	const [thinkTime, setThinkTime] = useState(100);
+	const [thinkTime, setThinkTime] = useState(10);
 
 	useEffect(() => {
 		return () => workerRefs.current.forEach((w) => w.terminate());
 	}, []);
 
 	const runSimulation = (games: number) => {
-		const initializedStates: GameState[] = [];
+		const initializedStates: GameData[] = [];
 		const initializedBoards: Board[] = [];
 
 		for (let i = 0; i < games; i++) {
-			initializedStates.push({ gameOver: false, winner: null, movesMade: 0 });
+			initializedStates.push({ gameState: "running", winner: null, movesMade: 0 });
 			initializedBoards.push(new Chess(8, 8).generateBoard(standardChessSetup).getBoard());
 		}
 
@@ -44,7 +45,9 @@ export default function TesterV2() {
 		initializedBoards.forEach((board, i) => {
 			const worker = new Worker(new URL('@/app/worker/chessWorker.js', import.meta.url));
 			worker.onmessage = (e) => {
-				const {board: updatedBoard, winner, gameOver, movesMade} = e.data;
+				const {board: updatedBoard, winner, gameState, movesMade} = e.data;
+
+				console.log("Received message")
 
 				// Update board
 				setChessPositions((prev) => {
@@ -56,11 +59,11 @@ export default function TesterV2() {
 				// Update game state
 				setGameStates((prev) => {
 					const newStates = [...prev];
-					newStates[i] = {gameOver, winner, movesMade};
+					newStates[i] = {gameState: gameState, winner, movesMade};
 					return newStates;
 				});
 
-				if (gameOver) {
+				if (gameState !== "running") {
 					// check if it's the last one to complete
 					completed.current++;
 
@@ -94,14 +97,14 @@ export default function TesterV2() {
 	const completed = useRef(0);
 	const whiteWins = gameStates.filter((s) => s.winner === "W").length;
 	const blackWins = gameStates.filter((s) => s.winner === "B").length;
-	const draws = games - (whiteWins + blackWins);
+	const staleOrDraws = gameStates.filter((s) => s.gameState === "stalemate" || s.gameState === "draw").length;
 
 	const avgPiecesLeft =
 		completed.current === 0
 			? "--"
 			: (
 				chessPositions.reduce((accum, board, i) => {
-					if (gameStates[i].gameOver) {
+					if (gameStates[i].gameState !== "running") {
 						return accum + board.flat().filter((p) => p !== null).length;
 					}
 					return accum;
@@ -114,8 +117,7 @@ export default function TesterV2() {
 			: (
 				(
 					gameStates.reduce((accum, state) => {
-						if (state.gameOver) {
-							console.log(state.movesMade);
+						if (state.gameState !== "running") {
 							return accum + state.movesMade;
 						}
 						return accum;
@@ -144,7 +146,7 @@ export default function TesterV2() {
 	return (
 		<div className="w-screen h-screen overflow-y-hidden flex flex-row justify-around">
 			<div className="py-24">
-				<h1 className="text-4xl font-mono font-bold mb-5">Settings</h1>
+				<h1 className="text-4xl font-mono font-bold mb-5">Match manager</h1>
 				<div className="flex flex-row gap-2 mb-2">
 					<button className="bg-green-500 px-5 py-2" onClick={handleRun} disabled={currentlyRunning || numGamesInput <= 0 || isNaN(numGamesInput)}>Run</button>
 					<button className="bg-red-500 px-5 py-2" onClick={() => {
@@ -188,9 +190,9 @@ export default function TesterV2() {
 					>
 						<option value={16}>16</option>
 						<option value={32}>32</option>
+						<option value={48}>48</option>
 						<option value={64}>64</option>
 						<option value={72}>72</option>
-						<option value={96}>96</option>
 					</select>
 				</div>
 				<div className="flex flex-row gap-2 items-center">
@@ -243,7 +245,7 @@ export default function TesterV2() {
 						segments={[
 							{ value: (whiteWins / games) * 100, color: "#ffffff", label: whiteWins, labelColor: "#000" },
 							{ value: (blackWins / games) * 100, color: "#000000", label: blackWins, labelColor: "#fff" },
-							{ value: (draws / games) * 100, color: "#ffaa00", label: draws },
+							{ value: (staleOrDraws / games) * 100, color: "#ffaa00", label: staleOrDraws, labelColor: "#000" },
 						]}
 						background="red"
 						width={300}
@@ -294,14 +296,20 @@ export default function TesterV2() {
 									return (
 										<div key={i} className="flex flex-col items-center justify-end">
 											{
-												gameStates[idx].gameOver ? (
+												gameStates[idx].gameState !== "running" ? (
 													<div
 														className="flex flex-row justify-center w-full"
 														style={{
-															color: gameStates[idx].winner === "W" ? "#000" : "#fff",
-															background: gameStates[idx].winner === "W" ? "#fff" : "#000",
+															color: gameStates[idx].winner === "W" ? "#000" : gameStates[idx].winner === "B" ? "#fff" : "#000",
+															background: gameStates[idx].winner === "W" ? "#fff" : gameStates[idx].winner === "B" ? "#000" : "#ffaa00",
 														}}
-													>{gameStates[idx].winner === "W" ? "White" : "Black"} win (in {gameStates[idx].movesMade} moves)</div>
+													>
+														{
+															gameStates[idx].gameState === "stalemate" ? "Stalemate" : gameStates[idx].gameState === "draw" ? "Draw" : (
+																<p>{gameStates[idx].winner === "W" ? "White" : "Black"} win (in {gameStates[idx].movesMade} moves)</p>
+															)
+														}
+													</div>
 												) : null
 											}
 											<ChessboardDisplay
@@ -310,6 +318,8 @@ export default function TesterV2() {
 												onMove={(_: Move) => {}}
 												getHighlights={() => []}
 												displayCoordinates={false}
+
+												disable
 											/>
 										</div>
 									)

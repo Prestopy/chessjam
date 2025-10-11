@@ -3,9 +3,10 @@ import Square from "@/app/Components/Square";
 import {DndProvider} from 'react-dnd'
 import {HTML5Backend} from 'react-dnd-html5-backend'
 import React, {useState} from "react";
-import {Board, Move} from "@/app/utils";
+import {Board} from "@/app/utils";
+import {Move} from "@/app/Move";
 
-export default function ChessboardDisplay({ squareDim, chessboard, onMove, displayCoordinates, getHighlights }: { squareDim: number, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (r: number, c: number) => {row: number, col: number}[] }) {
+export default function ChessboardDisplay({ squareDim, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (r: number, c: number) => {row: number, col: number}[], disable?: boolean }) {
 	const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
 	const [isMouseDown, setIsMouseDown] = useState(false);
 
@@ -34,7 +35,7 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 										onMouseLeave={() => setHoveredCell(null)}
 									>
 										<Square
-											movePieceHere={(fromRow, fromCol) => onMove({fromRow, fromCol, toRow: rowIndex, toCol: colIndex})}
+											movePieceHere={(fromRow, fromCol) => onMove(new Move(fromRow, fromCol, rowIndex, colIndex))}
 											row={rowIndex}
 											col={colIndex}
 											squareDim={squareDim}
@@ -42,10 +43,13 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 											piece={piece}
 											setIsMouseDown={setIsMouseDown}
 											onDrag={() => {
+												if (disable) return;
+
 												const newHighlights = getHighlights(rowIndex, colIndex);
 												setHighlights(newHighlights);
 											}}
-									        highlight={highlights.some(h => h.row === rowIndex && h.col === colIndex) ? (piece === null ? "possible" : "danger") : "none"}
+									        highlight={disable ? "none" : highlights.some(h => h.row === rowIndex && h.col === colIndex) ? (piece === null ? "possible" : "danger") : "none"}
+											disable={disable ?? false}
 										/>
 									</div>
 								})

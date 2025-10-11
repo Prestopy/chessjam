@@ -1,3 +1,5 @@
+import {Move} from "@/app/Move";
+
 export type Color = "W" | "B";
 
 export type PieceName = "King" | "Queen" | "Rook" | "Bishop" | "Knight" | "Pawn";
@@ -6,14 +8,24 @@ export interface Piece {
 	color: Color;
 }
 
-export interface Move {
-	fromRow: number;
-	fromCol: number;
-	toRow: number;
-	toCol: number;
-}
+// export interface Move {
+// 	fromRow: number;
+// 	fromCol: number;
+// 	toRow: number;
+// 	toCol: number;
+// }
+
+// export interface MoveDetails {
+// 	valid: boolean;
+// 	isEnPassant?: boolean;
+// }
 
 export type Board = (Piece | null)[][];
+export interface GameDetails {
+	state: GameState;
+	winner: Color | null;
+}
+export type GameState = "running" | "checkmate" | "stalemate" | "draw"
 export interface MoveHistoryEntry {
 	move: Move;
 	piece: Piece
@@ -26,6 +38,10 @@ export const pieceSymbols: { [key in PieceName]: { W: string; B: string } } = {
 	"Bishop": { W: "/pieces/wb.svg", B: "/pieces/bb.svg" },
 	"Knight": { W: "/pieces/wn.svg", B: "/pieces/bn.svg" },
 	"Pawn":   { W: "/pieces/wp.svg", B: "/pieces/bp.svg" }
+}
+
+export function swapColor(color: Color): Color {
+	return color === "W" ? "B" : "W";
 }
 
 // Piece generators

@@ -1,159 +1,141 @@
-import {Board, Color, Move, MoveHistoryEntry} from "@/app/utils";
+import { Board, Color, MoveHistoryEntry } from "@/app/utils";
+import { Move } from "@/app/Move";
 
-interface ValidatorContext {
+interface GeneratorContext {
 	board: Board;
 	moveHistory: MoveHistoryEntry[];
 	numRanks: number;
 }
 
-/**
- * Validates a pawn move, including standard moves, captures, and en passant.
- * This function assumes the move is within bounds and that the piece being moved is indeed a pawn of the specified color.
- * @param move
- * @param color
- * @param ctx
- */
-export function validatePawnMove(move: Move, color: Color, ctx: ValidatorContext): {
-	valid: boolean;
-	isEnPassant: boolean;
-} {
-	const {fromRow, fromCol, toRow, toCol} = move;
-	const piece = ctx.board[fromRow][fromCol];
-	if (!piece) return { valid: false, isEnPassant: false };
+export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color: Color, ctx: GeneratorContext): Move[] {
+	const moves: Move[] = [];
+	const direction = color === "W" ? -1 : 1;
+	const startRow = color === "W" ? ctx.numRanks - 2 : 1;
 
-	const direction = color === "W" ? -1 : 1; // White moves up, Black moves down
-	const startRow = color === "W" ? ctx.numRanks - 2 : 1; // Starting row for pawns
+	// Single step forward
+	const oneStepRow = fromRow + direction;
+	if (ctx.board[oneStepRow]?.[fromCol] === null) {
+		moves.push(new Move(fromRow, fromCol, oneStepRow, fromCol));
 
-	// Standard move
-	if (toCol === fromCol && toRow === fromRow + direction && ctx.board[toRow][toCol] === null) {
-		return {
-			valid: true,
-			isEnPassant: false
-		};
-	}
-
-	// Double move from starting position
-	if (toCol === fromCol && fromRow === startRow && toRow === fromRow + 2 * direction &&
-		ctx.board[fromRow+direction][toCol] === null && ctx.board[toRow][toCol] === null) {
-		return {
-			valid: true,
-			isEnPassant: false
-		};
-	}
-
-	// En passant
-	if (ctx.moveHistory.length >= 1) {
-		const enemyPrevMove = ctx.moveHistory[ctx.moveHistory.length - 1]; // Last move made
-
-		const epFromRow = color === "W" ? 3 : ctx.numRanks - 4;
-		const epToRow   = color === "W" ? 2 : ctx.numRanks - 3;
-
-		if (enemyPrevMove.piece.color !== color && enemyPrevMove.piece.name === "Pawn" && Math.abs(enemyPrevMove.move.fromRow - enemyPrevMove.move.toRow) === 2 && // confirm previous piece's move allows for en passant
-			fromRow === epFromRow && Math.abs(fromCol - enemyPrevMove.move.toCol) === 1 && // confirm our pawn is in the correct position
-			toCol === enemyPrevMove.move.toCol && toRow === epToRow) { // confirm we're moving to the correct square
-			return {
-				valid: true,
-				isEnPassant: true
-			};
+		// Double step from start
+		const twoStepRow = fromRow + 2 * direction;
+		if (fromRow === startRow && ctx.board[twoStepRow]?.[fromCol] === null) {
+			moves.push(new Move(fromRow, fromCol, twoStepRow, fromCol));
 		}
 	}
 
-	// Capturing move
-	if (Math.abs(toCol - fromCol) === 1 && toRow === fromRow + direction &&
-		ctx.board[toRow][toCol] !== null && ctx.board[toRow][toCol]?.color !== piece.color) {
-		return {
-			valid: true,
-			isEnPassant: false
-		};
+	// Captures (diagonal left/right)
+	for (const dc of [-1, 1]) {
+		const toCol = fromCol + dc;
+		const toRow = fromRow + direction;
+		if (ctx.board[toRow]?.[toCol] && ctx.board[toRow][toCol]?.color !== color) {
+			moves.push(new Move(fromRow, fromCol, toRow, toCol));
+		}
 	}
 
-	return {
-		valid: false,
-		isEnPassant: false
-	}
-}
+	// En passant
+	if (ctx.moveHistory.length > 0) {
+		const enemyPrevMove = ctx.moveHistory.at(-1)!;
+		const epFromRow = color === "W" ? 3 : ctx.numRanks - 4;
+		const epToRow = color === "W" ? 2 : ctx.numRanks - 3;
 
-/**
- * Validates a rook move, ensuring it moves in a straight line and that its path is not blocked.
- * This function assumes the move is within bounds and that the piece being moved is indeed a rook of the specified color.
- * @param move
- * @param color
- * @param ctx
- */
-export function validateRookMove(move: Move, color: Color, ctx: ValidatorContext): {
-	valid: boolean
-} {
-	const {fromRow, fromCol, toRow, toCol} = move;
-	const piece = ctx.board[fromRow][fromCol];
-	if (!piece) return { valid: false };
-
-	if (fromRow !== toRow && fromCol !== toCol) return { valid: false }; // Must move in straight line
-	const rowStep = fromRow === toRow ? 0 : (toRow > fromRow ? 1 : -1);
-	const colStep = fromCol === toCol ? 0 : (toCol > fromCol ? 1 : -1);
-
-	let r = fromRow + rowStep;
-	let c = fromCol + colStep;
-	while (r !== toRow || c !== toCol) {
-		if (ctx.board[r][c] !== null) return { valid: false }; // Path is blocked
-		r += rowStep;
-		c += colStep;
+		if (
+			fromRow === epFromRow &&
+			enemyPrevMove.piece.name === "Pawn" &&
+			enemyPrevMove.piece.color !== color &&
+			Math.abs(enemyPrevMove.move.fromRow - enemyPrevMove.move.toRow) === 2 &&
+			Math.abs(fromCol - enemyPrevMove.move.toCol) === 1
+		) {
+			moves.push(new Move(fromRow, fromCol, epToRow, enemyPrevMove.move.toCol));
+		}
 	}
 
-	if (ctx.board[toRow][toCol]?.color === color) return { valid: false }; // Can't capture own piece
-
-	return { valid: true };
+	return moves;
 }
+export function generatePseudoRookMoves(fromRow: number, fromCol: number, color: Color, ctx: GeneratorContext): Move[] {
+	const moves: Move[] = [];
+	const directions = [
+		[1, 0], [-1, 0], [0, 1], [0, -1]
+	];
 
-export function validateBishopMove(move: Move, color: Color, ctx: ValidatorContext): {
-	valid: boolean
-} {
-	const {fromRow, fromCol, toRow, toCol} = move;
-	const piece = ctx.board[fromRow][fromCol];
-	if (!piece) return { valid: false };
-
-	if (Math.abs(fromRow-toRow) !== Math.abs(fromCol-toCol)) return { valid: false }; // Must move in straight line
-	const rowStep = toRow > fromRow ? 1 : -1;
-	const colStep = toCol > fromCol ? 1 : -1;
-
-	let r = fromRow + rowStep;
-	let c = fromCol + colStep;
-	while (r !== toRow && c !== toCol) {
-		if (ctx.board[r][c] !== null) return { valid: false }; // Path is blocked
-		r += rowStep;
-		c += colStep;
+	for (const [dr, dc] of directions) {
+		let r = fromRow + dr;
+		let c = fromCol + dc;
+		while (ctx.board[r]?.[c] !== undefined) {
+			if (ctx.board[r][c] === null) {
+				moves.push(new Move(fromRow, fromCol, r, c));
+			} else {
+				if (ctx.board[r][c]!.color !== color) {
+					moves.push(new Move(fromRow, fromCol, r, c));
+				}
+				break; // Stop after first blocker
+			}
+			r += dr;
+			c += dc;
+		}
 	}
 
-	if (ctx.board[toRow][toCol]?.color === color) return { valid: false }; // Can't capture own piece
-
-	return { valid: true };
+	return moves;
 }
+export function generatePseudoBishopMoves(fromRow: number, fromCol: number, color: Color, ctx: GeneratorContext): Move[] {
+	const moves: Move[] = [];
+	const directions = [
+		[1, 1], [1, -1], [-1, 1], [-1, -1]
+	];
 
-export function validateKnightMove(move: Move, color: Color, ctx: ValidatorContext): {
-	valid: boolean
-} {
-	const {fromRow, fromCol, toRow, toCol} = move;
-	const piece = ctx.board[fromRow][fromCol];
-	if (!piece) return { valid: false };
+	for (const [dr, dc] of directions) {
+		let r = fromRow + dr;
+		let c = fromCol + dc;
+		while (ctx.board[r]?.[c] !== undefined) {
+			if (ctx.board[r][c] === null) {
+				moves.push(new Move(fromRow, fromCol, r, c));
+			} else {
+				if (ctx.board[r][c]!.color !== color) {
+					moves.push(new Move(fromRow, fromCol, r, c));
+				}
+				break;
+			}
+			r += dr;
+			c += dc;
+		}
+	}
 
-	const rowDiff = Math.abs(fromRow - toRow);
-	const colDiff = Math.abs(fromCol - toCol);
-	if (!((rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2))) return { valid: false }; // Knight moves in L shape
-
-	if (ctx.board[toRow][toCol]?.color === color) return { valid: false }; // Can't capture own piece
-
-	return { valid: true };
+	return moves;
 }
+export function generatePseudoKnightMoves(fromRow: number, fromCol: number, color: Color, ctx: GeneratorContext): Move[] {
+	const moves: Move[] = [];
+	const deltas = [
+		[-2, -1], [-2, 1], [2, -1], [2, 1],
+		[-1, -2], [-1, 2], [1, -2], [1, 2]
+	];
 
-export function validateKingMove(move: Move, color: Color, ctx: ValidatorContext): {
-	valid: boolean
-} {
-	const {fromRow, fromCol, toRow, toCol} = move;
-	const piece = ctx.board[fromRow][fromCol];
-	if (!piece) return { valid: false };
+	for (const [dr, dc] of deltas) {
+		const r = fromRow + dr;
+		const c = fromCol + dc;
+		if (ctx.board[r]?.[c] !== undefined) {
+			const target = ctx.board[r][c];
+			if (target === null || target.color !== color) {
+				moves.push(new Move(fromRow, fromCol, r, c));
+			}
+		}
+	}
 
-	if (Math.abs(fromRow - toRow) > 1 || Math.abs(fromCol - toCol) > 1) return { valid: false }; // King can only move one square in any direction
-
-	if (ctx.board[toRow][toCol]?.color === color) return { valid: false }; // Can't capture own piece
-
-	return { valid: true };
+	return moves;
+}
+export function generatePseudoKingMoves(fromRow: number, fromCol: number, color: Color, ctx: GeneratorContext): Move[] {
+	const moves: Move[] = [];
+	for (let dr = -1; dr <= 1; dr++) {
+		for (let dc = -1; dc <= 1; dc++) {
+			if (dr === 0 && dc === 0) continue;
+			const r = fromRow + dr;
+			const c = fromCol + dc;
+			if (ctx.board[r]?.[c] !== undefined) {
+				const target = ctx.board[r][c];
+				if (target === null || target.color !== color) {
+					moves.push(new Move(fromRow, fromCol, r, c));
+				}
+			}
+		}
+	}
+	return moves;
 }
