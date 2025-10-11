@@ -75,12 +75,14 @@ export class Chess {
 		return this;
 	}
 
-	setSquare(row: number, col: number, piece: Piece | null): Chess {
+	setBoard(b: Board) {
+		this.board = b;
+	}
+
+	setSquare(row: number, col: number, piece: Piece | null) {
 		if (row < 0 || row >= this.numRanks || col < 0 || col >= this.numFiles) return this;
 
 		this.board[row][col] = piece;
-
-		return this;
 	}
 
 	addHistoryEntry(entry: MoveHistoryEntry) {
@@ -135,6 +137,12 @@ export class Chess {
 		const {fromRow, fromCol, toRow, toCol} = move;
 		const movingPiece = this.getSquare(move.fromRow, move.fromCol);
 		if (!movingPiece) return { ok: false };
+
+		if (move.isPromotionMove()) {
+			this.setSquare(toRow, toCol, { name: "Queen", color: movingPiece.color }); // Auto-promote to Queen
+			this.setSquare(fromRow, fromCol, null);
+			return { ok: true };
+		}
 
 		if (move.isEnPassantMove()) {
 			const epRow = movingPiece?.color === "W" ? toRow + 1 : toRow - 1;
@@ -351,7 +359,7 @@ export class Chess {
 			newBoard.push(row);
 		}
 
-		this.board = newBoard;
+		this.setBoard(newBoard);
 		this.numRanks = ranks;
 		this.numFiles = files;
 

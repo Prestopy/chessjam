@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import { Chess } from "@/app/Chess";
-import {Board, GameState, standardChessSetup} from "@/app/utils";
+import {Board, GameState, randomPieceOrEmpty, standardChessSetup} from "@/app/utils";
 import { Color } from "@/app/utils";
 import ProgressBar from "@/app/Components/ProgressBar";
 
@@ -13,6 +13,7 @@ interface GameData {
 	gameState: GameState;
 	movesMade: number;
 	winner: Color | null;
+	averageThinkTime: number;
 }
 export default function TesterV2() {
 	const [games, setGames] = useState(0);
@@ -34,7 +35,7 @@ export default function TesterV2() {
 		const initializedBoards: Board[] = [];
 
 		for (let i = 0; i < games; i++) {
-			initializedStates.push({ gameState: "running", winner: null, movesMade: 0 });
+			initializedStates.push({ gameState: "running", winner: null, movesMade: 0, averageThinkTime: 0 });
 			initializedBoards.push(new Chess(8, 8).generateBoard(standardChessSetup).getBoard());
 		}
 
@@ -45,7 +46,7 @@ export default function TesterV2() {
 		initializedBoards.forEach((board, i) => {
 			const worker = new Worker(new URL('@/app/worker/chessWorker.js', import.meta.url));
 			worker.onmessage = (e) => {
-				const {board: updatedBoard, winner, gameState, movesMade} = e.data;
+				const {board: updatedBoard, winner, gameState, movesMade, averageThinkTime} = e.data;
 
 				console.log("Received message")
 
@@ -59,7 +60,7 @@ export default function TesterV2() {
 				// Update game state
 				setGameStates((prev) => {
 					const newStates = [...prev];
-					newStates[i] = {gameState: gameState, winner, movesMade};
+					newStates[i] = {gameState, winner, movesMade, averageThinkTime};
 					return newStates;
 				});
 
@@ -111,19 +112,24 @@ export default function TesterV2() {
 				}, 0) / completed.current
 			).toFixed(2);
 
-	const avgMovesMade =
+	const avgMovesMadeTilWin =
 		completed.current === 0
 			? "--"
 			: (
 				(
 					gameStates.reduce((accum, state) => {
-						if (state.gameState !== "running") {
+						if (state.gameState === "checkmate") {
 							return accum + state.movesMade;
 						}
 						return accum;
 					}, 0) / completed.current
 				).toFixed(2)
-			)
+			);
+
+	const avgThinkTime =
+		(
+			gameStates.reduce((accum, state) => accum + state.averageThinkTime, 0) / games
+		).toFixed(4);
 
 	const parentRef = useRef(null)
 
@@ -146,8 +152,8 @@ export default function TesterV2() {
 	return (
 		<div className="w-screen h-screen overflow-y-hidden flex flex-row justify-around">
 			<div className="py-24">
-				<h1 className="text-4xl font-mono font-bold mb-5">Match manager</h1>
-				<div className="flex flex-row gap-2 mb-2">
+				<h1 className="text-4xl font-mono font-bold mb-5">Match Manager</h1>
+				<div className="flex flex-row gap-2 mb-5">
 					<button className="bg-green-500 px-5 py-2" onClick={handleRun} disabled={currentlyRunning || numGamesInput <= 0 || isNaN(numGamesInput)}>Run</button>
 					<button className="bg-red-500 px-5 py-2" onClick={() => {
 						handleClear();
@@ -219,7 +225,7 @@ export default function TesterV2() {
 					/>
 				</div>
 
-				<h1 className="text-4xl font-mono font-bold mb-5 mt-10">Stats</h1>
+				<h2 className="text-2xl font-mono font-bold mb-3 mt-10">Stats</h2>
 
 				<div className="flex flex-row gap-2 items-center">
 					<label className="font-bold">Completed:</label>
@@ -260,7 +266,14 @@ export default function TesterV2() {
 
 				<div className="flex flex-row gap-2 items-center">
 					<label className="font-bold">Average moves till win:</label>
-					<p>{avgMovesMade}</p>
+					<p>{avgMovesMadeTilWin}</p>
+				</div>
+
+				<h2 className="text-2xl font-mono font-bold mb-3 mt-5">Chess Engine</h2>
+
+				<div className="flex flex-row gap-2 items-center">
+					<label className="font-bold">Average thinking time:</label>
+					<p>{avgThinkTime} ms</p>
 				</div>
 			</div>
 

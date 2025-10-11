@@ -48,7 +48,7 @@ export default function Home() {
 					}
 				</div>
 				<ChessboardDisplay
-					squareDim={64}
+					squareDim={80}
 					chessboard={chessPosition}
 					onMove={handleMove}
 					getHighlights={(r: number, c: number) => chessGame.current.getTurn() !== chessGame.current.getSquare(r, c)?.color ? [] : chessGame.current.generateMoves(r, c, true).map(m => ({row: m.toRow, col: m.toCol}))}

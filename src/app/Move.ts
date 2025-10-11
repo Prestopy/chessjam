@@ -42,6 +42,7 @@ export class Move {
 		if (!piece) return this;
 
 		if (piece.name === "Pawn") {
+			// En passant
 			const lastMove = moveHistory[moveHistory.length - 1];
 			if (lastMove) {
 				const lastMovedPiece = board[lastMove.move.toRow][lastMove.move.toCol];
@@ -56,6 +57,12 @@ export class Move {
 				) {
 					this.markAsEnPassant();
 				}
+			}
+
+			// Promotion
+			const promotionRow = piece.color === "W" ? 0 : board.length - 1;
+			if (this.toRow === promotionRow) {
+				this.markAsPromotion();
 			}
 		}
 
