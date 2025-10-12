@@ -12,7 +12,14 @@ export class Chess {
 	private numFiles: number;
 	private moveHistory: MoveHistoryEntry[];
 	private gameDetails: GameDetails;
-	// private skipValidation: boolean
+
+
+	private kingSideCastleRights: {
+		[key in Color]: boolean
+	} = { W: true, B: true };
+	private queenSideCastleRights: {
+		[key in Color]: boolean
+	} = { W: true, B: true };
 
 	private currentTurn: Color = "W";
 
@@ -20,7 +27,6 @@ export class Chess {
 		ranks: number,
 		files: number,
 		board?: Board,
-		// skipValidation: boolean = false,
 	) {
 		this.numRanks = ranks;
 		this.numFiles = files;
@@ -34,7 +40,6 @@ export class Chess {
 			state: "running",
 			winner: null
 		};
-		// this.skipValidation = skipValidation;
 	}
 
 	// GETTERS #########################################################################################################
@@ -91,11 +96,11 @@ export class Chess {
 
 	// CHESS FUNCTIONS #################################################################################################
 	/**
-	 * Moves a piece from one square to another. Validates the move before executing it.
+	 * Validate a move, then apply it to the board if valid.
 	 * @param move
 	 * @returns A boolean indicating whether the move was successful.
 	 */
-	move(move: Move): boolean {
+	move(move: Move): { ok: true, enrichedMove: Move } | { ok: false } {
 		const {fromRow, fromCol, toRow, toCol} = move;
 
 		if (
@@ -103,20 +108,34 @@ export class Chess {
 			fromRow < 0 || fromRow >= this.numRanks ||
 			fromCol < 0 || fromCol >= this.numFiles ||
 			this.getSquare(fromRow, fromCol) === null
-		) return false;
+		) return { ok: false };
 
 		const movingPiece = this.getSquare(fromRow, fromCol)!;
-		if (movingPiece.color !== this.currentTurn) return false; // Incorrect turn
+		if (movingPiece.color !== this.currentTurn) return { ok: false }; // Incorrect turn
 
 		// Check for move validity
 		const moveValidation = this.validateMove(move, true);
-		if (!moveValidation.valid) return false;
+		if (!moveValidation.valid) return { ok: false };
 
-		// Add flags (like en passant, etc.)
-		move.enrichMove(this.board, this.moveHistory);
+		// Make the move
+		const enrichedMove = moveValidation.enrichedMove;
+		this.makeMove(enrichedMove);
+		this.addHistoryEntry({ move: enrichedMove, piece: movingPiece });
 
-		this.makeMove(move);
-		this.addHistoryEntry({ move: move, piece: movingPiece });
+		// Update castling rights
+		if (movingPiece.name === "King") { // If king moves, lose both castling rights
+			this.kingSideCastleRights[movingPiece.color] = false;
+			this.queenSideCastleRights[movingPiece.color] = false;
+		} else if (movingPiece.name === "Rook") { // If a rook moves, lose that side's castling right
+			if (fromCol === 0) this.queenSideCastleRights[movingPiece.color] = false;
+			else if (fromCol === this.numFiles - 1) this.kingSideCastleRights[movingPiece.color] = false;
+		} else if (enrichedMove.isCaptureMove()) { // If a rook is captured, lose that side's castling right
+			const capturedPiece = this.getSquare(toRow, toCol);
+			if (capturedPiece && capturedPiece.name === "Rook") {
+				if (toCol === 0) this.queenSideCastleRights[capturedPiece.color] = false;
+				else if (toCol === this.numFiles - 1) this.kingSideCastleRights[capturedPiece.color] = false;
+			}
+		}
 
 		if (this.isMate(swapColor(movingPiece.color)) !== "running") {
 			this.gameDetails.state = this.isMate(swapColor(movingPiece.color));
@@ -126,7 +145,7 @@ export class Chess {
 			this.gameDetails.winner = null;
 		}
 
-		return true;
+		return { ok: true, enrichedMove };
 	}
 
 	/**
@@ -148,6 +167,25 @@ export class Chess {
 			const epRow = movingPiece?.color === "W" ? toRow + 1 : toRow - 1;
 			this.setSquare(epRow, toCol, null); // Remove the captured pawn
 		}
+
+		if (move.isCastleMove()) {
+			if (toCol === fromCol + 2) {
+				// King-side castle
+				const rook = this.getSquare(fromRow, this.numFiles - 1);
+				if (rook && rook.name === "Rook" && rook.color === movingPiece.color) {
+					this.setSquare(fromRow, fromCol + 1, rook);
+					this.setSquare(fromRow, this.numFiles - 1, null);
+				}
+			} else if (toCol === fromCol - 2) {
+				// Queen-side castle
+				const rook = this.getSquare(fromRow, 0);
+				if (rook && rook.name === "Rook" && rook.color === movingPiece.color) {
+					this.setSquare(fromRow, fromCol - 1, rook);
+					this.setSquare(fromRow, 0, null);
+				}
+			}
+		}
+
 		this.setSquare(toRow, toCol, movingPiece);
 		this.setSquare(fromRow, fromCol, null);
 
@@ -155,7 +193,7 @@ export class Chess {
 	}
 
 	/**
-	 * Generates all moves for a given color.
+	 * Generates all moves for a given color. The moves returned have flags attached.
 	 * @param color
 	 * @param legal - If true, only returns legal moves; if false, returns pseudo-legal moves.
 	 */
@@ -170,11 +208,12 @@ export class Chess {
 				}
 			}
 		}
+
 		return allMoves;
 	}
 
 	/**
-	 * Generates all moves for a piece at a given position.
+	 * Generates all moves for a piece at a given position. The moves returned have flags attached.
 	 * @param fromRow
 	 * @param fromCol
 	 * @param legal - If true, only returns legal moves; if false, returns pseudo-legal moves.
@@ -186,7 +225,11 @@ export class Chess {
 		const generatorCtx = {
 			board: this.board,
 			moveHistory: this.moveHistory,
-			numRanks: this.numRanks
+			numRanks: this.numRanks,
+			castlingRights: {
+				kingSide: this.kingSideCastleRights[movingPiece.color],
+				queenSide: this.queenSideCastleRights[movingPiece.color]
+			}
 		}
 
 		let pseudoLegalMoves: Move[] = [];
@@ -233,18 +276,19 @@ export class Chess {
 	 * @param move
 	 * @param legal - If true, checks for legality (including check); if false, only checks for pseudo-legality.
 	 */
-	validateMove(move: Move, legal: boolean): { valid: boolean } {
+	validateMove(move: Move, legal: boolean): { valid: true, enrichedMove: Move } | { valid: false } {
 		const {fromRow, fromCol, toRow, toCol} = move;
 		const movingPiece = this.getSquare(fromRow, fromCol);
 		if (!movingPiece) return { valid: false }; // No piece to move
 
-		if (this.getSquare(toRow, toCol)?.color === movingPiece.color) return { valid: false }; // No cannibalism...
+		if (this.getSquare(toRow, toCol)?.color === movingPiece.color) return { valid: false,  }; // No cannibalism...
 		// I'm pretty sure ^^ is already checked in the individual piece validators but whatever
 
 		const possibleMoves = this.generateMoves(fromRow, fromCol, legal);
-		const isValid = possibleMoves.some(m => m.toRow === toRow && m.toCol === toCol);
+		const moveMade = possibleMoves.find(m => m.toRow === toRow && m.toCol === toCol);
 
-		return { valid: isValid };
+		if (!moveMade) return { valid: false };
+		return { valid: true, enrichedMove: moveMade };
 	}
 
 	isInCheck(color: Color): boolean {
@@ -271,7 +315,6 @@ export class Chess {
 
 	checkInsufficientMaterial(): boolean { // FIXME: Not complete
 		const pieces = this.board.flat().filter(p => p !== null) as Piece[];
-		console.log(pieces);
 		if (pieces.length === 2) {
 			// Only kings left
 			return pieces.every(p => p.name === "King");

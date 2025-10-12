@@ -5,6 +5,10 @@ interface GeneratorContext {
 	board: Board;
 	moveHistory: MoveHistoryEntry[];
 	numRanks: number;
+	castlingRights: {
+		kingSide: boolean;
+		queenSide: boolean;
+	}
 }
 
 export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color: Color, ctx: GeneratorContext): Move[] {
@@ -15,7 +19,12 @@ export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color:
 	// Single step forward
 	const oneStepRow = fromRow + direction;
 	if (ctx.board[oneStepRow]?.[fromCol] === null) {
-		moves.push(new Move(fromRow, fromCol, oneStepRow, fromCol));
+		if (oneStepRow === 0 || oneStepRow === ctx.numRanks - 1) {
+			// Promotion
+			moves.push(new Move(fromRow, fromCol, oneStepRow, fromCol).markAsPromotion());
+		} else {
+			moves.push(new Move(fromRow, fromCol, oneStepRow, fromCol));
+		}
 
 		// Double step from start
 		const twoStepRow = fromRow + 2 * direction;
@@ -29,7 +38,7 @@ export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color:
 		const toCol = fromCol + dc;
 		const toRow = fromRow + direction;
 		if (ctx.board[toRow]?.[toCol] && ctx.board[toRow][toCol]?.color !== color) {
-			moves.push(new Move(fromRow, fromCol, toRow, toCol));
+			moves.push(new Move(fromRow, fromCol, toRow, toCol).markAsCapture());
 		}
 	}
 
@@ -46,7 +55,7 @@ export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color:
 			Math.abs(enemyPrevMove.move.fromRow - enemyPrevMove.move.toRow) === 2 &&
 			Math.abs(fromCol - enemyPrevMove.move.toCol) === 1
 		) {
-			moves.push(new Move(fromRow, fromCol, epToRow, enemyPrevMove.move.toCol));
+			moves.push(new Move(fromRow, fromCol, epToRow, enemyPrevMove.move.toCol).markAsEnPassant());
 		}
 	}
 
@@ -66,7 +75,7 @@ export function generatePseudoRookMoves(fromRow: number, fromCol: number, color:
 				moves.push(new Move(fromRow, fromCol, r, c));
 			} else {
 				if (ctx.board[r][c]!.color !== color) {
-					moves.push(new Move(fromRow, fromCol, r, c));
+					moves.push(new Move(fromRow, fromCol, r, c).markAsCapture());
 				}
 				break; // Stop after first blocker
 			}
@@ -91,7 +100,7 @@ export function generatePseudoBishopMoves(fromRow: number, fromCol: number, colo
 				moves.push(new Move(fromRow, fromCol, r, c));
 			} else {
 				if (ctx.board[r][c]!.color !== color) {
-					moves.push(new Move(fromRow, fromCol, r, c));
+					moves.push(new Move(fromRow, fromCol, r, c).markAsCapture());
 				}
 				break;
 			}
@@ -114,8 +123,10 @@ export function generatePseudoKnightMoves(fromRow: number, fromCol: number, colo
 		const c = fromCol + dc;
 		if (ctx.board[r]?.[c] !== undefined) {
 			const target = ctx.board[r][c];
-			if (target === null || target.color !== color) {
+			if (target === null) {
 				moves.push(new Move(fromRow, fromCol, r, c));
+			} else if (target.color !== color) {
+				moves.push(new Move(fromRow, fromCol, r, c).markAsCapture());
 			}
 		}
 	}
@@ -131,11 +142,35 @@ export function generatePseudoKingMoves(fromRow: number, fromCol: number, color:
 			const c = fromCol + dc;
 			if (ctx.board[r]?.[c] !== undefined) {
 				const target = ctx.board[r][c];
-				if (target === null || target.color !== color) {
+				if (target === null) {
 					moves.push(new Move(fromRow, fromCol, r, c));
+				} else if (target.color !== color) {
+					moves.push(new Move(fromRow, fromCol, r, c).markAsCapture());
 				}
 			}
 		}
 	}
+
+	// Castling
+	if (ctx.castlingRights.kingSide) {
+		const row = fromRow;
+		if (
+			ctx.board[row][fromCol + 1] === null &&
+			ctx.board[row][fromCol + 2] === null
+		) {
+			moves.push(new Move(fromRow, fromCol, row, fromCol + 2).markAsCastle());
+		}
+	}
+	if (ctx.castlingRights.queenSide) {
+		const row = fromRow;
+		if (
+			ctx.board[row][fromCol - 1] === null &&
+			ctx.board[row][fromCol - 2] === null &&
+			ctx.board[row][fromCol - 3] === null
+		) {
+			moves.push(new Move(fromRow, fromCol, row, fromCol - 2).markAsCastle());
+		}
+	}
+
 	return moves;
 }

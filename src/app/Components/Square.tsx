@@ -4,7 +4,7 @@ import {useEffect} from "react";
 import {pieceSymbols} from "@/app/utils";
 import {getEmptyImage} from "react-dnd-html5-backend";
 
-export default function Square({ movePieceHere, row, col, squareDim, white, piece, setIsMouseDown, onDrag, highlight, disable }: { movePieceHere: (row: number, col: number) => void, row: number, col: number, squareDim: number, white: boolean, piece: Piece | null, setIsMouseDown: (isDown: boolean) => void, onDrag: () => void, highlight: "none" | "possible" | "danger", disable: boolean }) {
+export default function Square({ movePieceHere, row, col, squareDim, white, piece, setIsMouseDown, onDrag, highlight, disabled }: { movePieceHere: (row: number, col: number) => void, row: number, col: number, squareDim: number, white: boolean, piece: Piece | null, setIsMouseDown: (isDown: boolean) => void, onDrag: () => void, highlight: "none" | "possible" | "danger", disabled: boolean }) {
 	const WHITE = "#f0d9b5";
 	const BLACK = "#b58863";
 
@@ -26,8 +26,8 @@ export default function Square({ movePieceHere, row, col, squareDim, white, piec
 		collect: (monitor) => ({
 			isDragging: monitor.isDragging()
 		}),
-		canDrag: () => !disable && piece !== null,
-	}), [disable, piece])
+		canDrag: () => !disabled && piece !== null,
+	}), [disabled, piece])
 
 	useEffect(() => {
 		if (piece === null) return;
@@ -55,7 +55,7 @@ export default function Square({ movePieceHere, row, col, squareDim, white, piec
 				anchorY: canvas.height / 2,
 			});
 		};
-	}, [piece]);
+	}, [dragPreview, piece, squareDim]);
 
 	const [{ isOver }, drop] = useDrop(
 		() => ({
@@ -80,7 +80,7 @@ export default function Square({ movePieceHere, row, col, squareDim, white, piec
 				boxShadow: isOver ? (highlight !== "none" ? "inset 0 0 0 4px rgb(0, 255, 255)" : "inset 0 0 0 4px rgb(255, 0, 0)") : "none"
 			}}>
 				{
-					piece === null ? null : <img width={squareDim-squarePadding} src={pieceSymbols[piece.name][piece.color]} />
+					piece === null ? null : <img width={squareDim-squarePadding} src={pieceSymbols[piece.name][piece.color]} draggable={!disabled}/>
 				}
 			</div>
 		</div>

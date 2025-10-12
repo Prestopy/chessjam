@@ -49,7 +49,7 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 												setHighlights(newHighlights);
 											}}
 									        highlight={disable ? "none" : highlights.some(h => h.row === rowIndex && h.col === colIndex) ? (piece === null ? "possible" : "danger") : "none"}
-											disable={disable ?? false}
+											disabled={disable ?? false}
 										/>
 									</div>
 								})

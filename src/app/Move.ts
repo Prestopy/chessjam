@@ -9,6 +9,7 @@ export class Move {
 
 	private isEnPassant: boolean = false;
 	private isPromotion: boolean = false;
+	private isCastle: boolean = false;
 	private isCapture: boolean = false;
 
 	constructor(fromRow: number, fromCol: number, toRow: number, toCol: number) {
@@ -27,46 +28,24 @@ export class Move {
 	isCaptureMove() {
 		return this.isCapture;
 	}
-	markAsEnPassant() {
+	isCastleMove() {
+		return this.isCastle;
+	}
+
+	markAsEnPassant(): Move {
 		this.isEnPassant = true;
+		return this;
 	}
-	markAsPromotion() {
+	markAsPromotion(): Move {
 		this.isPromotion = true;
+		return this;
 	}
-	markAsCapture() {
+	markAsCastle(): Move {
+		this.isCastle = true;
+		return this;
+	}
+	markAsCapture(): Move {
 		this.isCapture = true;
-	}
-
-	enrichMove(board: Board, moveHistory: MoveHistoryEntry[]): Move {
-		const piece = board[this.fromRow][this.fromCol];
-		if (!piece) return this;
-
-		if (piece.name === "Pawn") {
-			// En passant
-			const lastMove = moveHistory[moveHistory.length - 1];
-			if (lastMove) {
-				const lastMovedPiece = board[lastMove.move.toRow][lastMove.move.toCol];
-				if (
-					lastMovedPiece &&
-					lastMovedPiece.name === "Pawn" &&
-					Math.abs(lastMove.move.toRow - lastMove.move.fromRow) === 2 && // Last move was a 2-square pawn advance
-					lastMove.move.toRow === this.fromRow && // Last moved pawn is now next to the moving pawn
-					Math.abs(lastMove.move.toCol - this.fromCol) === 1 && // Last moved pawn is adjacent in column
-					this.toRow === (piece.color === "W" ? this.fromRow - 1 : this.fromRow + 1) && // Moving diagonally forward
-					this.toCol === lastMove.move.toCol // Moving to the column of the last moved pawn
-				) {
-					this.markAsEnPassant();
-				}
-			}
-
-			// Promotion
-			const promotionRow = piece.color === "W" ? 0 : board.length - 1;
-			if (this.toRow === promotionRow) {
-				this.markAsPromotion();
-			}
-		}
-
-		// Can handle castling, promotion, etc. here too
 		return this;
 	}
 }

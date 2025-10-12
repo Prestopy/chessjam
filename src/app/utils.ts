@@ -1,4 +1,7 @@
 import {Move} from "@/app/Move";
+import {Engine} from "@/app/engines/Engine";
+import Engine_v1 from "@/app/engines/Engine_v1";
+import Engine_v2 from "@/app/engines/Engine_v2";
 
 export type Color = "W" | "B";
 
@@ -8,17 +11,29 @@ export interface Piece {
 	color: Color;
 }
 
-// export interface Move {
-// 	fromRow: number;
-// 	fromCol: number;
-// 	toRow: number;
-// 	toCol: number;
-// }
+export type EngineVersion = "1" | "2";
+export interface EngineDetail {
+	version: EngineVersion,
+	name: string,
+	getEngine: () => Engine
+}
+export const allEngines: EngineDetail[] =
+	[
+		{
+			version: "1",
+			name: "Random Move",
+			getEngine: () => new Engine_v1(),
+		},
+		{
+			version: "2",
+			name: "Random Capture Move",
+			getEngine: () => new Engine_v2(),
+		}
+	];
 
-// export interface MoveDetails {
-// 	valid: boolean;
-// 	isEnPassant?: boolean;
-// }
+export function getEngineDetail(ver: string) {
+	return allEngines.find(e => e.version === ver) ?? null;
+}
 
 export type Board = (Piece | null)[][];
 export interface GameDetails {
