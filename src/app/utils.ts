@@ -102,3 +102,13 @@ export function standardChessSetup(rank: number, file: number): Piece | null {
 		return null;
 	}
 }
+
+export function moveToNotation(move: Move): string {
+	const files = "abcdefgh";
+	const fromFile = files[move.fromCol];
+	const fromRank = 8 - move.fromRow;
+	const toFile = files[move.toCol];
+	const toRank = 8 - move.toRow;
+
+	return `${fromFile}${fromRank}${toFile}${toRank}`;
+}

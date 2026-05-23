@@ -7,8 +7,8 @@ import {
 	EngineDetail,
 	EngineVersion,
 	GameDetails,
-	getEngineDetail,
-	PieceName,
+	getEngineDetail, moveToNotation,
+	PieceName, pieceSymbols,
 	standardChessSetup
 } from "@/app/utils";
 import {Move} from "@/app/Move";
@@ -111,7 +111,7 @@ export default function Home() {
 					return; // prevents TS warning
 				}
 
-				chessGame.current.makeMove(move);
+				chessGame.current.move(move);
 				playMoveSound(move);
 				chessGame.current.nextTurn();
 				setCurrentTurn(chessGame.current.getTurn());
@@ -150,14 +150,34 @@ export default function Home() {
 						)
 					}
 				</div>
-				<ChessboardDisplay
-					squareDim={80}
-					chessboard={chessPosition}
-					onMove={handleMove}
-					getHighlights={(r: number, c: number) => chessGame.current.getTurn() !== chessGame.current.getSquare(r, c)?.color ? [] : chessGame.current.generateMoves(r, c, true).map(m => ({row: m.toRow, col: m.toCol}))}
+				<div className="flex flex-row justify-center gap-10">
+					<ChessboardDisplay
+						squareDim={80}
+						chessboard={chessPosition}
+						onMove={handleMove}
+						getHighlights={(r: number, c: number) => chessGame.current.getTurn() !== chessGame.current.getSquare(r, c)?.color ? [] : chessGame.current.generateMoves(r, c, true).map(m => ({row: m.toRow, col: m.toCol}))}
 
-					disable={gameState.state !== "running"}
-				/>
+						disable={gameState.state !== "running"}
+					/>
+
+					<div className="flex flex-row">
+						{
+							chessGame.current.getHistory().length > 0 ? (
+								<div className="flex flex-col gap-1 max-h-[640px] w-32 border-white border-2 overflow-y-auto">
+									{chessGame.current.getHistory().map((entry, i) => (
+										<div key={i} className="flex flex-row gap-1 items-center">
+											<span>{Math.floor(i/2)+1}. </span>
+											<img src={pieceSymbols[entry.piece.name][entry.piece.color]} alt={`${entry.piece.color} ${entry.piece.name}`} className="w-4 h-4" />
+											<span>{moveToNotation(entry.move)}</span>
+										</div>
+									))}
+								</div>
+							) : (
+								<p className="text-gray-400 italic">No moves made yet</p>
+							)
+						}
+					</div>
+				</div>
 			</div>
 
 			<div className="flex flex-row gap-2 items-center mt-10">

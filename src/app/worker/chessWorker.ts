@@ -28,21 +28,21 @@ self.onmessage = function (e) {
 	setInterval(() => {
 		if (gameOver || !wEngine || !bEngine || !game) return;
 
-		let randomMove: Move | null;
+		let engineMove: Move | null;
 
 		// Get move
 		const startTime = performance.now(); // Measure #####
-		if (game.getTurn() === "W") randomMove = wEngine.pickMove();
-		else randomMove = bEngine.pickMove();
+		if (game.getTurn() === "W") engineMove = wEngine.pickMove();
+		else engineMove = bEngine.pickMove();
 		const endTime = performance.now();   // Measure #####
 
 
-		if (randomMove === null) {
+		if (engineMove === null) {
 			callGameOver();
 			return;
 		}
 
-		game.move(randomMove);
+		game.move(engineMove);
 
 
 		// Check for game over
