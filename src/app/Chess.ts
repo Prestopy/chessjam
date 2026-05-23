@@ -117,6 +117,10 @@ export class Chess {
 		const moveValidation = this.validateMove(move, true);
 		if (!moveValidation.valid) return { ok: false };
 
+		// capture the piece at destination BEFORE applying the move so we can
+		// correctly update castling rights if a rook was captured
+		const capturedPieceBefore = this.getSquare(toRow, toCol);
+
 		// Make the move
 		const enrichedMove = moveValidation.enrichedMove;
 		this.makeMove(enrichedMove);
@@ -130,7 +134,7 @@ export class Chess {
 			if (fromCol === 0) this.queenSideCastleRights[movingPiece.color] = false;
 			else if (fromCol === this.numFiles - 1) this.kingSideCastleRights[movingPiece.color] = false;
 		} else if (enrichedMove.isCaptureMove()) { // If a rook is captured, lose that side's castling right
-			const capturedPiece = this.getSquare(toRow, toCol);
+			const capturedPiece = capturedPieceBefore;
 			if (capturedPiece && capturedPiece.name === "Rook") {
 				if (toCol === 0) this.queenSideCastleRights[capturedPiece.color] = false;
 				else if (toCol === this.numFiles - 1) this.kingSideCastleRights[capturedPiece.color] = false;
@@ -158,7 +162,7 @@ export class Chess {
 		if (!movingPiece) return { ok: false };
 
 		if (move.isPromotionMove()) {
-			this.setSquare(toRow, toCol, { name: "Queen", color: movingPiece.color }); // Auto-promote to Queen
+			this.setSquare(toRow, toCol, move.getPromotionPiece());
 			this.setSquare(fromRow, fromCol, null);
 			return { ok: true };
 		}
@@ -285,10 +289,18 @@ export class Chess {
 		// I'm pretty sure ^^ is already checked in the individual piece validators but whatever
 
 		const possibleMoves = this.generateMoves(fromRow, fromCol, legal);
-		const moveMade = possibleMoves.find(m => m.toRow === toRow && m.toCol === toCol);
+		const moveMade = possibleMoves.filter(m => m.toRow === toRow && m.toCol === toCol);
 
-		if (!moveMade) return { valid: false };
-		return { valid: true, enrichedMove: moveMade };
+		if (moveMade.length === 0) return { valid: false };
+		if (moveMade.length === 1) return { valid: true, enrichedMove: moveMade[0] };
+
+		// Multiple moves found (e.g., promotions)
+		const promotionMove = moveMade.find(m => m.getPromotionPiece()?.name === move.getPromotionPiece()?.name);
+		if (!promotionMove) {
+			throw new Error("Multiple moves found but none match the promotion piece.");
+			// return { valid: false };
+		}
+		return { valid: true, enrichedMove: promotionMove };
 	}
 
 	isInCheck(color: Color): boolean {
@@ -374,6 +386,10 @@ export class Chess {
 		const c = new Chess(this.numRanks, this.numFiles, this.getBoard());
 		c.currentTurn = this.currentTurn;
 		c.moveHistory = this.getHistory();
+
+		c.kingSideCastleRights = { ...this.kingSideCastleRights };
+		c.queenSideCastleRights = { ...this.queenSideCastleRights };
+		c.gameDetails = { ...this.gameDetails };
 
 		return c;
 	}

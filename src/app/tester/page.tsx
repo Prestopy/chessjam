@@ -23,6 +23,8 @@ interface GameData {
 }
 export default function TesterV2() {
 	const [games, setGames] = useState(0);
+	const MAX_GAMES = 1500;
+	const MAX_VISIBLE_GAMES = 200;
 	const [numGamesInput, setNumGamesInput] = useState(100);
 	const [currentlyRunning, setCurrentlyRunning] = useState(false);
 
@@ -42,7 +44,7 @@ export default function TesterV2() {
 		return () => workerRefs.current.forEach((w) => w.terminate());
 	}, []);
 
-	const runSimulation = (games: number, measure: boolean) => {
+	const runSimulation = (games: number, measure: boolean, thinkTime: number) => {
 		const initializedStates: GameData[] = [];
 		const initializedBoards: Board[] = [];
 
@@ -114,7 +116,7 @@ export default function TesterV2() {
 		}
 
 		setGames(numGamesInput);
-		runSimulation(numGamesInput, measure);
+		runSimulation(numGamesInput, measure, measure ? 0 : thinkTime);
 		setCurrentlyRunning(true);
 	}
 	const handleClear = () => {
@@ -125,6 +127,8 @@ export default function TesterV2() {
 
 		setChessPositions([]);
 		setGameStates([]);
+		setEngine1Wins(0);
+		setEngine2Wins(0);
 
 		// setCurrentlyRunning(false); <-- CAN CAUSE RACE CONDITION
 	};
@@ -207,7 +211,7 @@ export default function TesterV2() {
 			<div className="py-24">
 				<h1 className="text-4xl font-mono font-bold mb-5">Match Manager</h1>
 				<div className="flex flex-row gap-2 mb-5">
-					<button className="bg-green-500 px-5 py-2" onClick={() => handleRun()} disabled={currentlyRunning || numGamesInput <= 0 || isNaN(numGamesInput)}>Run</button>
+					<button className="bg-green-500 px-5 py-2" onClick={() => handleRun()} disabled={currentlyRunning || numGamesInput <= 0 || isNaN(numGamesInput) || numGamesInput > MAX_VISIBLE_GAMES}>Run</button>
 					<button className="bg-indigo-500 px-5 py-2" onClick={() => handleRun(true)} disabled={currentlyRunning || numGamesInput <= 0 || isNaN(numGamesInput)}>Run & Measure</button>
 					<button className="bg-red-500 px-5 py-2" onClick={() => {
 						handleClear();
@@ -236,7 +240,7 @@ export default function TesterV2() {
 							let num = parseInt(value);
 							if (isNaN(num)) return;
 
-							num = Math.min(Math.max(num, 1), 1000);
+							num = Math.min(Math.max(num, 1), MAX_GAMES);
 							setNumGamesInput(num);
 						}}
 					/>
@@ -352,16 +356,31 @@ export default function TesterV2() {
 				</div>
 
 				<div className="flex flex-row gap-2 items-center">
+					<label className="font-bold">Engine wins:</label>
+					<div className="flex flex-col gap-2">
+						<ProgressBar
+							segments={[
+								{ value: engine1Wins+engine2Wins === 0 ? 0 : ((engine1Wins / (engine1Wins+engine2Wins)) * 100), color: "#ff8d3c", label: `E1 (v${engine1}) ` + engine1Wins, labelColor: "#000" },
+								{ value: engine1Wins+engine2Wins === 0 ? 0 : ((engine2Wins / (engine1Wins+engine2Wins)) * 100), color: "#d2ff0c", label: `E2 (v${engine2}) ` + engine2Wins, labelColor: "#000" },
+							]}
+							background="red"
+							width={300}
+							height={20}
+						/>
+					</div>
+				</div>
+
+				<div className="flex flex-row gap-2 items-center">
 					<label className="font-bold">Engine 1 (v{engine1}) wins:</label>
 					<div className="flex flex-col gap-2">
-						{engine1Wins} ({engine1Wins+engine2Wins === 0 ? "--" : (engine1Wins / (engine1Wins+engine2Wins))*100}%)
+						{engine1Wins} ({engine1Wins+engine2Wins === 0 ? "--" : ((engine1Wins / (engine1Wins+engine2Wins))*100).toFixed(4)}%)
 					</div>
 				</div>
 
 				<div className="flex flex-row gap-2 items-center">
 					<label className="font-bold">Engine 2 (v{engine2}) wins:</label>
 					<div className="flex flex-col gap-2">
-						{engine2Wins} ({engine1Wins+engine2Wins === 0 ? "--" : (engine2Wins / (engine1Wins+engine2Wins))*100}%)
+						{engine2Wins} ({engine1Wins+engine2Wins === 0 ? "--" : ((engine2Wins / (engine1Wins+engine2Wins))*100).toFixed(4)}%)
 					</div>
 				</div>
 

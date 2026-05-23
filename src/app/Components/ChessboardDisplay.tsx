@@ -35,7 +35,10 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 										onMouseLeave={() => setHoveredCell(null)}
 									>
 										<Square
-											movePieceHere={(fromRow, fromCol) => onMove(new Move(fromRow, fromCol, rowIndex, colIndex))}
+											movePieceHere={(fromRow, fromCol) => {
+												if (disable) return;
+												onMove(new Move(fromRow, fromCol, rowIndex, colIndex));
+											}}
 											row={rowIndex}
 											col={colIndex}
 											squareDim={squareDim}

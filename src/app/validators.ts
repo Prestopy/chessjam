@@ -1,4 +1,4 @@
-import { Board, Color, MoveHistoryEntry } from "@/app/utils";
+import {Board, Color, MoveHistoryEntry, Piece, PieceName, swapColor} from "@/app/utils";
 import { Move } from "@/app/Move";
 
 interface GeneratorContext {
@@ -19,12 +19,8 @@ export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color:
 	// Single step forward
 	const oneStepRow = fromRow + direction;
 	if (ctx.board[oneStepRow]?.[fromCol] === null) {
-		if (oneStepRow === 0 || oneStepRow === ctx.numRanks - 1) {
-			// Promotion
-			moves.push(new Move(fromRow, fromCol, oneStepRow, fromCol).markAsPromotion());
-		} else {
-			moves.push(new Move(fromRow, fromCol, oneStepRow, fromCol));
-		}
+		// Normal move
+		moves.push(new Move(fromRow, fromCol, oneStepRow, fromCol));
 
 		// Double step from start
 		const twoStepRow = fromRow + 2 * direction;
@@ -37,8 +33,8 @@ export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color:
 	for (const dc of [-1, 1]) {
 		const toCol = fromCol + dc;
 		const toRow = fromRow + direction;
-		if (ctx.board[toRow]?.[toCol] && ctx.board[toRow][toCol]?.color !== color) {
-			moves.push(new Move(fromRow, fromCol, toRow, toCol).markAsCapture());
+		if (ctx.board[toRow]?.[toCol] && ctx.board[toRow][toCol].color !== color) {
+			moves.push(new Move(fromRow, fromCol, toRow, toCol).markAsCapture(ctx.board[toRow][toCol]));
 		}
 	}
 
@@ -55,7 +51,22 @@ export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color:
 			Math.abs(enemyPrevMove.move.fromRow - enemyPrevMove.move.toRow) === 2 &&
 			Math.abs(fromCol - enemyPrevMove.move.toCol) === 1
 		) {
-			moves.push(new Move(fromRow, fromCol, epToRow, enemyPrevMove.move.toCol).markAsEnPassant());
+			moves.push(new Move(fromRow, fromCol, epToRow, enemyPrevMove.move.toCol).markAsEnPassant(swapColor(color)));
+		}
+	}
+
+	// Promotion
+	for (let i=moves.length-1; i>=0; i--) {
+		if (moves[i].toRow === 0 || moves[i].toRow === ctx.numRanks - 1) {
+			// Add promotion moves
+			for (const p of ["Queen", "Rook", "Bishop", "Knight"] as PieceName[]) {
+				moves.push(moves[i].copy().markAsPromotion({
+					name: p,
+					color: color
+				}));
+			}
+
+			moves.splice(i, 1); // Remove the original move
 		}
 	}
 
@@ -63,24 +74,26 @@ export function generatePseudoPawnMoves(fromRow: number, fromCol: number, color:
 }
 export function generatePseudoRookMoves(fromRow: number, fromCol: number, color: Color, ctx: GeneratorContext): Move[] {
 	const moves: Move[] = [];
-	const directions = [
+	const deltas = [
 		[1, 0], [-1, 0], [0, 1], [0, -1]
 	];
 
-	for (const [dr, dc] of directions) {
-		let r = fromRow + dr;
-		let c = fromCol + dc;
-		while (ctx.board[r]?.[c] !== undefined) {
-			if (ctx.board[r][c] === null) {
-				moves.push(new Move(fromRow, fromCol, r, c));
+	for (const [dr, dc] of deltas) {
+		let row = fromRow + dr;
+		let col = fromCol + dc;
+
+		while (ctx.board[row]?.[col] !== undefined) {
+			const blocker = ctx.board[row][col];
+			if (blocker === null) {
+				moves.push(new Move(fromRow, fromCol, row, col));
 			} else {
-				if (ctx.board[r][c]!.color !== color) {
-					moves.push(new Move(fromRow, fromCol, r, c).markAsCapture());
+				if (blocker.color !== color) {
+					moves.push(new Move(fromRow, fromCol, row, col).markAsCapture(blocker));
 				}
 				break; // Stop after first blocker
 			}
-			r += dr;
-			c += dc;
+			row += dr;
+			col += dc;
 		}
 	}
 
@@ -88,24 +101,25 @@ export function generatePseudoRookMoves(fromRow: number, fromCol: number, color:
 }
 export function generatePseudoBishopMoves(fromRow: number, fromCol: number, color: Color, ctx: GeneratorContext): Move[] {
 	const moves: Move[] = [];
-	const directions = [
+	const deltas = [
 		[1, 1], [1, -1], [-1, 1], [-1, -1]
 	];
 
-	for (const [dr, dc] of directions) {
-		let r = fromRow + dr;
-		let c = fromCol + dc;
-		while (ctx.board[r]?.[c] !== undefined) {
-			if (ctx.board[r][c] === null) {
-				moves.push(new Move(fromRow, fromCol, r, c));
+	for (const [dr, dc] of deltas) {
+		let row = fromRow + dr;
+		let col = fromCol + dc;
+		while (ctx.board[row]?.[col] !== undefined) {
+			const blocker = ctx.board[row][col];
+			if (blocker === null) {
+				moves.push(new Move(fromRow, fromCol, row, col));
 			} else {
-				if (ctx.board[r][c]!.color !== color) {
-					moves.push(new Move(fromRow, fromCol, r, c).markAsCapture());
+				if (blocker.color !== color) {
+					moves.push(new Move(fromRow, fromCol, row, col).markAsCapture(blocker));
 				}
 				break;
 			}
-			r += dr;
-			c += dc;
+			row += dr;
+			col += dc;
 		}
 	}
 
@@ -119,14 +133,14 @@ export function generatePseudoKnightMoves(fromRow: number, fromCol: number, colo
 	];
 
 	for (const [dr, dc] of deltas) {
-		const r = fromRow + dr;
-		const c = fromCol + dc;
-		if (ctx.board[r]?.[c] !== undefined) {
-			const target = ctx.board[r][c];
+		const row = fromRow + dr;
+		const col = fromCol + dc;
+		if (ctx.board[row]?.[col] !== undefined) {
+			const target = ctx.board[row][col];
 			if (target === null) {
-				moves.push(new Move(fromRow, fromCol, r, c));
+				moves.push(new Move(fromRow, fromCol, row, col));
 			} else if (target.color !== color) {
-				moves.push(new Move(fromRow, fromCol, r, c).markAsCapture());
+				moves.push(new Move(fromRow, fromCol, row, col).markAsCapture(target));
 			}
 		}
 	}
@@ -138,14 +152,14 @@ export function generatePseudoKingMoves(fromRow: number, fromCol: number, color:
 	for (let dr = -1; dr <= 1; dr++) {
 		for (let dc = -1; dc <= 1; dc++) {
 			if (dr === 0 && dc === 0) continue;
-			const r = fromRow + dr;
-			const c = fromCol + dc;
-			if (ctx.board[r]?.[c] !== undefined) {
-				const target = ctx.board[r][c];
+			const row = fromRow + dr;
+			const col = fromCol + dc;
+			if (ctx.board[row]?.[col] !== undefined) {
+				const target = ctx.board[row][col];
 				if (target === null) {
-					moves.push(new Move(fromRow, fromCol, r, c));
+					moves.push(new Move(fromRow, fromCol, row, col));
 				} else if (target.color !== color) {
-					moves.push(new Move(fromRow, fromCol, r, c).markAsCapture());
+					moves.push(new Move(fromRow, fromCol, row, col).markAsCapture(target));
 				}
 			}
 		}

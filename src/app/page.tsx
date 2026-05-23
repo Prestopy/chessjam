@@ -2,7 +2,15 @@
 import {useEffect, useRef, useState} from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import {Chess} from "@/app/Chess";
-import {allEngines, EngineDetail, EngineVersion, GameDetails, getEngineDetail, standardChessSetup} from "@/app/utils";
+import {
+	allEngines,
+	EngineDetail,
+	EngineVersion,
+	GameDetails,
+	getEngineDetail,
+	PieceName,
+	standardChessSetup
+} from "@/app/utils";
 import {Move} from "@/app/Move";
 import {Color} from "@/app/utils";
 import {Engine} from "@/app/engines/Engine";
@@ -52,9 +60,31 @@ export default function Home() {
 	}, []);
 
 	const handleMove = (move: Move) => {
-		const success = chessGame.current.move(move);
-		if (success.ok) {
-			playMoveSound(success.enrichedMove);
+		const pieceMoved = chessGame.current.getBoard()[move.fromRow][move.fromCol];
+		if (pieceMoved === null) return;
+		if (pieceMoved.name === "Pawn" && (pieceMoved.color === "W" && move.toRow === 0 || pieceMoved.color === "B" && move.toRow === 7)) {
+			const promotionChoice = window.prompt("Promote to (Q, R, B, N):", "Q");
+			if (promotionChoice) {
+				const promoPieceName: PieceName | null = promotionChoice.toUpperCase() === "Q" ? "Queen" :
+					promotionChoice.toUpperCase() === "R" ? "Rook" :
+						promotionChoice.toUpperCase() === "B" ? "Bishop" :
+							promotionChoice.toUpperCase() === "N" ? "Knight" : null;
+				if (promoPieceName) {
+					move.markAsPromotion({ name: promoPieceName as PieceName, color: pieceMoved.color });
+				} else {
+					alert("Invalid promotion piece! Defaulting to Queen.");
+					move.markAsPromotion({ name: "Queen", color: pieceMoved.color });
+				}
+			} else {
+				alert("No promotion piece selected! Defaulting to Queen.");
+				move.markAsPromotion({ name: "Queen", color: pieceMoved.color });
+			}
+		}
+
+		const boardMove = chessGame.current.move(move);
+
+		if (boardMove.ok) {
+			playMoveSound(boardMove.enrichedMove);
 
 			chessGame.current.nextTurn();
 			setCurrentTurn(chessGame.current.getTurn());
@@ -135,7 +165,10 @@ export default function Home() {
 				<select
 					className="font-mono border border-white"
 					value={engineVer ?? "--"}
-					onChange={(e) => handleSetEngine(e.target.value as EngineVersion)}
+					onChange={(e) => {
+						if (e.target.value === "--") handleSetEngine(null);
+						else handleSetEngine(e.target.value as EngineVersion | null);
+					}}
 				>
 					<option key={-1} value="--">None</option>
 					{

@@ -2,6 +2,7 @@ import {Move} from "@/app/Move";
 import {Engine} from "@/app/engines/Engine";
 import Engine_v1 from "@/app/engines/Engine_v1";
 import Engine_v2 from "@/app/engines/Engine_v2";
+import Engine_v3 from "@/app/engines/Engine_v3";
 
 export type Color = "W" | "B";
 
@@ -11,7 +12,7 @@ export interface Piece {
 	color: Color;
 }
 
-export type EngineVersion = "1" | "2";
+export type EngineVersion = "1" | "2" | "3";
 export interface EngineDetail {
 	version: EngineVersion,
 	name: string,
@@ -26,9 +27,14 @@ export const allEngines: EngineDetail[] =
 		},
 		{
 			version: "2",
-			name: "Random Capture Move",
+			name: "Prioritize Capture Moves",
 			getEngine: () => new Engine_v2(),
-		}
+		},
+		{
+			version: "3",
+			name: "Prioritize Valuable Piece Captures",
+			getEngine: () => new Engine_v3(),
+		},
 	];
 
 export function getEngineDetail(ver: string) {
