@@ -1,7 +1,14 @@
 import {Chess} from "@/app/Chess";
 import {Engine} from "@/app/engines/Engine";
-import {Move} from "@/app/Move";
-import {Color} from "@/app/utils";
+import {
+	isCaptureMove,
+	isCastleMove,
+	isEnPassantMove,
+	isPromotionMove,
+	moveCaptured, moveFromCol,
+	moveFromRow
+} from "@/app/Move";
+import {Color, Move, pieceName, PieceName} from "@/app/bitboardHelpers";
 
 interface Evaluation {
 	move: Move;
@@ -14,7 +21,7 @@ export default class Engine_v3 extends Engine {
 	}
 
 	pickMove(): Move | null {
-		if (!this.chessGame || !this.color) return null;
+		if (!this.chessGame) return null;
 		if (this.chessGame.getTurn() !== this.color) return null; // not this engine's turn
 
 		const allMoves = this.chessGame.generateAllMoves(this.color, true);
@@ -22,46 +29,49 @@ export default class Engine_v3 extends Engine {
 
 		const evals: Evaluation[] = allMoves.map(m => {
 			let score = 0;
-			switch (this.chessGame?.getBoard()[m.fromRow][m.fromCol]?.name) {
-				case "Pawn":
-					score += 5;
-					break;
-				case "Knight":
-				case "Bishop":
-					score += 1;
-					break;
-				case "Rook":
-					score += 2;
-					break;
-				case "Queen":
-					score += 3;
-					break;
+			const piece = this.chessGame?.getSquare(moveFromRow(m), moveFromCol(m));
+			if (piece) {
+				switch (pieceName(piece)) {
+					case PieceName.Pawn:
+						score += 1;
+						break;
+					case PieceName.Knight:
+					case PieceName.Bishop:
+						score += 3;
+						break;
+					case PieceName.Rook:
+						score += 5;
+						break;
+					case PieceName.Queen:
+						score += 9;
+						break;
+				}
 			}
 
-			if (m.isCaptureMove()) {
+			if (isCaptureMove(m)) {
 				score += 5;
-				const capturedPiece = m.getCapturedPiece();
+				const capturedPiece = moveCaptured(m);
 				if (capturedPiece) {
-					switch (capturedPiece.name) {
-						case "Pawn":
+					switch (pieceName(capturedPiece)) {
+						case PieceName.Pawn:
 							score += 1;
 							break;
-						case "Knight":
-						case "Bishop":
+						case PieceName.Knight:
+						case PieceName.Bishop:
 							score += 3;
 							break;
-						case "Rook":
+						case PieceName.Rook:
 							score += 5;
 							break;
-						case "Queen":
+						case PieceName.Queen:
 							score += 9;
 							break;
 					}
 				}
 			}
-			if (m.isPromotionMove()) score += 10;
-			if (m.isCastleMove()) score += 5;
-			if (m.isEnPassantMove()) score += 2; // For the fun you know lol
+			if (isPromotionMove(m)) score += 10;
+			if (isCastleMove(m)) score += 5;
+			if (isEnPassantMove(m)) score += 2; // For the fun you know lol
 
 			return {
 				move: m,

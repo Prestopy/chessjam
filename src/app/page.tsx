@@ -4,22 +4,30 @@ import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import {Chess} from "@/app/Chess";
 import {
 	allEngines,
-	EngineDetail,
 	EngineVersion,
 	GameDetails,
-	getEngineDetail, moveToNotation,
-	PieceName, pieceSymbols,
-	standardChessSetup
+	GameState,
+	getEngineDetail,
+	moveToNotation,
+	pieceSymbols
 } from "@/app/utils";
-import {Move} from "@/app/Move";
-import {Color} from "@/app/utils";
 import {Engine} from "@/app/engines/Engine";
+import {Color, makePiece, Move, Piece, pieceColor, PieceName, pieceName} from "@/app/bitboardHelpers";
+import {
+	isCaptureMove,
+	isCastleMove,
+	moveFromCol,
+	moveFromRow, movePromotion,
+	moveToCol,
+	moveToRow,
+	setPromotionPiece
+} from "@/app/Move";
 
 export default function Home() {
-	const chessGame = useRef(new Chess(8, 8).generateBoard(standardChessSetup));
+	const chessGame = useRef(new Chess(8, 8));
 	const engine = useRef<Engine | null>(null);
 	const [engineVer, setEngineVer] = useState<EngineVersion | null>(null);
-	const [engineColor, setEngineColor] = useState<Color | null>("B");
+	const [engineColor, setEngineColor] = useState<Color | null>(Color.Black);
 
 	const handleSetEngine = (ver: EngineVersion | null) => {
 		if (ver === null) {
@@ -42,9 +50,9 @@ export default function Home() {
 	}
 
 	const [chessPosition, setChessPosition] = useState(chessGame.current.getBoard());
-	const [currentTurn, setCurrentTurn] = useState<"W" | "B">("W");
+	const [currentTurn, setCurrentTurn] = useState<Color>(Color.White);
 	const [gameState, setGameState] = useState<GameDetails>({
-		state: "running",
+		state: GameState.Running,
 		winner: null
 	});
 
@@ -59,25 +67,27 @@ export default function Home() {
 		castleSfx.current = new Audio("/sfx/castle.mp3");
 	}, []);
 
+	// FIXME: This logic shouldn't be in page.tsx :sob: :sob:
 	const handleMove = (move: Move) => {
-		const pieceMoved = chessGame.current.getBoard()[move.fromRow][move.fromCol];
+		const pieceMoved = chessGame.current.getSquare(moveFromRow(move), moveFromCol(move));
 		if (pieceMoved === null) return;
-		if (pieceMoved.name === "Pawn" && (pieceMoved.color === "W" && move.toRow === 0 || pieceMoved.color === "B" && move.toRow === 7)) {
-			const promotionChoice = window.prompt("Promote to (Q, R, B, N):", "Q");
-			if (promotionChoice) {
-				const promoPieceName: PieceName | null = promotionChoice.toUpperCase() === "Q" ? "Queen" :
-					promotionChoice.toUpperCase() === "R" ? "Rook" :
-						promotionChoice.toUpperCase() === "B" ? "Bishop" :
-							promotionChoice.toUpperCase() === "N" ? "Knight" : null;
-				if (promoPieceName) {
-					move.markAsPromotion({ name: promoPieceName as PieceName, color: pieceMoved.color });
-				} else {
-					alert("Invalid promotion piece! Defaulting to Queen.");
-					move.markAsPromotion({ name: "Queen", color: pieceMoved.color });
+		if ((pieceMoved === Piece.WhitePawn && moveToRow(move) === 7) || (pieceMoved === Piece.BlackPawn && moveToRow(move) === 0)) {
+			if (chessGame.current.validateMove(move, true).valid) {
+				const promotionChoice = window.prompt("Promote to (Q, R, B, N):", "Q");
+				if (promotionChoice) {
+					const promoPieceName: PieceName | null = promotionChoice.toUpperCase() === "Q" ? PieceName.Queen :
+						promotionChoice.toUpperCase() === "R" ? PieceName.Rook :
+							promotionChoice.toUpperCase() === "B" ? PieceName.Bishop :
+								promotionChoice.toUpperCase() === "N" ? PieceName.Knight : null;
+					if (promoPieceName) {
+						move = setPromotionPiece(move, makePiece(promoPieceName, pieceColor(pieceMoved)));
+					}
 				}
-			} else {
-				alert("No promotion piece selected! Defaulting to Queen.");
-				move.markAsPromotion({ name: "Queen", color: pieceMoved.color });
+
+				if (movePromotion(move) === null) {
+					alert("No promotion piece/invalid promotion selected! Defaulting to Queen.");
+					move = setPromotionPiece(move, makePiece(PieceName.Queen, pieceColor(pieceMoved)));
+				}
 			}
 		}
 
@@ -93,14 +103,25 @@ export default function Home() {
 		}
 	}
 
+	const getHighlightsForSquare = (r: number, c: number) => {
+		const game = chessGame.current;
+		const piece = game.getSquare(r, c);
+
+		if (piece === null) return [];
+		if (game.getTurn() !== pieceColor(piece)) return [];
+
+		return game.generateMoves(r, c, true)
+			.map(m => ({ row: moveToRow(m), col: moveToCol(m) }));
+	}
+
 	const playMoveSound = (move: Move) => {
-		if (move.isCaptureMove()) captureSfx.current?.play();
-		else if (move.isCastleMove()) castleSfx.current?.play();
+		if (isCaptureMove(move)) captureSfx.current?.play();
+		else if (isCastleMove(move)) castleSfx.current?.play();
 		else moveSfx.current?.play();
 	}
 
 	useEffect(() => {
-		if (chessGame.current.getTurn() === engineColor && gameState.state === "running" && engine.current) {
+		if (chessGame.current.getTurn() === engineColor && gameState.state === GameState.Running && engine.current) {
 			setTimeout(() => {
 				const eng = engine.current;
 				if (!eng) return; // TS now knows eng is not null below
@@ -125,13 +146,13 @@ export default function Home() {
 	return (
 		<div className="min-w-screen min-h-screen flex flex-col items-center justify-center">
 			<h1 className="text-4xl font-mono font-bold mb-5">
-				{gameState.state === "running" ? ((currentTurn === "W" ? "WHITE" : "BLACK") + " to move") : gameState.state.toUpperCase()}
-				{gameState.state === "checkmate" ? <span className="font-normal font-small text-gray-400"> in {chessGame.current.getHistory().length} moves</span> : null}
+				{gameState.state === GameState.Running ? ((currentTurn === Color.White ? "WHITE" : "BLACK") + " to move") : gameState.state.toUpperCase()}
+				{gameState.state === GameState.Checkmate ? <span className="font-normal font-small text-gray-400"> in {chessGame.current.getHistory().length} moves</span> : null}
 			</h1>
 
 			<div className="flex flex-row items-center justify-center gap-4 mb-10">
 				<div style={{ width: pointCounterWidth, height: 25, background: "#000000" }}>
-					<div style={{ width: pointCounterWidth/(chessGame.current.countPoints("W")+chessGame.current.countPoints("B"))*chessGame.current.countPoints("W"), height: "100%", background: "#ffffff" }} />
+					<div style={{ width: pointCounterWidth/(chessGame.current.countPoints(Color.White)+chessGame.current.countPoints(Color.Black))*chessGame.current.countPoints(Color.White), height: "100%", background: "#ffffff" }} />
 				</div>
 			</div>
 
@@ -139,14 +160,14 @@ export default function Home() {
 				<div
 					className="w-full h-8 flex flex-row justify-center items-center"
 					style={{
-						color: gameState.winner === "W" ? "#000" : gameState.winner === "B" ? "#fff" : "#000",
-						background: gameState.winner === "W" ? "#fff" : gameState.winner === "B" ? "#000" : "#ffaa00",
-						visibility: gameState.state === "running" ? "hidden" : "visible",
+						color: gameState.winner === Color.White ? "#000" : gameState.winner === Color.Black ? "#fff" : "#000",
+						background: gameState.winner === Color.White ? "#fff" : gameState.winner === Color.Black ? "#000" : "#ffaa00",
+						visibility: gameState.state === GameState.Running ? "hidden" : "visible",
 					}}
 				>
 					{
-						gameState.state === "running" ? null : gameState.state === "stalemate" || gameState.state === "draw" ? "Stalemate/Draw" : (
-							<p>{gameState.winner === "W" ? "White" : "Black"} win</p>
+						gameState.state === GameState.Running ? null : gameState.state === GameState.Stalemate || gameState.state === GameState.Draw ? "Stalemate/Draw" : (
+							<p>{gameState.winner === Color.White ? "White" : "Black"} win</p>
 						)
 					}
 				</div>
@@ -155,28 +176,28 @@ export default function Home() {
 						squareDim={80}
 						chessboard={chessPosition}
 						onMove={handleMove}
-						getHighlights={(r: number, c: number) => chessGame.current.getTurn() !== chessGame.current.getSquare(r, c)?.color ? [] : chessGame.current.generateMoves(r, c, true).map(m => ({row: m.toRow, col: m.toCol}))}
+						getHighlights={getHighlightsForSquare}
 
-						disable={gameState.state !== "running"}
+						disable={gameState.state !== GameState.Running}
 					/>
 
-					<div className="flex flex-row">
-						{
-							chessGame.current.getHistory().length > 0 ? (
-								<div className="flex flex-col gap-1 max-h-[640px] w-32 border-white border-2 overflow-y-auto">
-									{chessGame.current.getHistory().map((entry, i) => (
-										<div key={i} className="flex flex-row gap-1 items-center">
-											<span>{Math.floor(i/2)+1}. </span>
-											<img src={pieceSymbols[entry.piece.name][entry.piece.color]} alt={`${entry.piece.color} ${entry.piece.name}`} className="w-4 h-4" />
-											<span>{moveToNotation(entry.move)}</span>
-										</div>
-									))}
-								</div>
-							) : (
-								<p className="text-gray-400 italic">No moves made yet</p>
-							)
-						}
-					</div>
+					{/*<div className="flex flex-row">*/}
+					{/*	{*/}
+					{/*		chessGame.current.getHistory().length > 0 ? (*/}
+					{/*			<div className="flex flex-col gap-1 max-h-[640px] w-32 border-white border-2 overflow-y-auto">*/}
+					{/*				{chessGame.current.getHistory().map((entry, i) => (*/}
+					{/*					<div key={i} className="flex flex-row gap-1 items-center">*/}
+					{/*						<span>{Math.floor(i/2)+1}. </span>*/}
+					{/*						<img src={pieceSymbols[pieceName(entry.piece)][pieceColor(entry.piece)]} alt={`${pieceColor(entry.piece)} ${pieceName(entry.piece)}`} className="w-4 h-4" />*/}
+					{/*						<span>{moveToNotation(entry.move)}</span>*/}
+					{/*					</div>*/}
+					{/*				))}*/}
+					{/*			</div>*/}
+					{/*		) : (*/}
+					{/*			<p className="text-gray-400 italic">No moves made yet</p>*/}
+					{/*		)*/}
+					{/*	}*/}
+					{/*</div>*/}
 				</div>
 			</div>
 

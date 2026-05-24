@@ -1,10 +1,9 @@
-import {Chess} from "@/app/Chess";
 import Square from "@/app/Components/Square";
 import {DndProvider} from 'react-dnd'
 import {HTML5Backend} from 'react-dnd-html5-backend'
-import React, {useState} from "react";
-import {Board} from "@/app/utils";
-import {Move} from "@/app/Move";
+import React, {useEffect, useState} from "react";
+import {Board, lsb, Move, Piece, squareIndex} from "@/app/bitboardHelpers";
+import {makeMove} from "@/app/Move";
 
 export default function ChessboardDisplay({ squareDim, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (r: number, c: number) => {row: number, col: number}[], disable?: boolean }) {
 	const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
@@ -12,11 +11,30 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 
 	const [highlights, setHighlights] = useState<{ row: number; col: number }[]>([]);
 
+	const [structuredBoard, setStructuredBoard] = useState<(Piece | null)[][]>([]);
+
+	function boardToGrid(board: Board, ranks: number, files: number): (Piece | null)[][] {
+		const grid: (Piece | null)[][] = Array.from({ length: ranks }, () => Array(files).fill(null));
+		for (let p = 0; p < 12; p++) {
+			let bb = board[p] < 0n ? board[p] + (1n << 64n) : board[p];
+			while (bb) {
+				const sq = lsb(bb);
+				bb &= bb - 1n; // clear LSB
+				grid[sq >> 3][sq & 7] = p as Piece;
+			}
+		}
+		return grid;
+	}
+
+	useEffect(() => {
+		setStructuredBoard(boardToGrid(chessboard, 8, 8));
+	}, [chessboard]);
+
 	return (
 		<DndProvider backend={HTML5Backend}>
 			<div className="select-none">
 				{
-					chessboard.map((row, rowIndex) => (
+					structuredBoard.map((row, rowIndex) => (
 						<div key={rowIndex} className="flex flex-row">
 							{
 								displayCoordinates &&
@@ -37,7 +55,7 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 										<Square
 											movePieceHere={(fromRow, fromCol) => {
 												if (disable) return;
-												onMove(new Move(fromRow, fromCol, rowIndex, colIndex));
+												onMove(makeMove(squareIndex(fromRow, fromCol), squareIndex(rowIndex, colIndex)));
 											}}
 											row={rowIndex}
 											col={colIndex}
@@ -64,7 +82,7 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 					displayCoordinates && (
 						<div className="flex items-end justify-end">
 							{
-								Array.from({ length: chessboard[chessboard.length-1].length }).map((_, index) => (
+								Array.from({ length: 8 }).map((_, index) => (
 									<p key={index} className={`inline-block font-mono pt-2 ${hoveredCell?.col == index ? (isMouseDown ? "text-orange-400" : "text-white") : "text-slate-400"}`} style={{ width: squareDim }}>
 										{String.fromCharCode(97 + index).toUpperCase()}
 									</p>

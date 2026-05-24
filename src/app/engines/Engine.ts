@@ -1,11 +1,10 @@
 import {Chess} from "@/app/Chess";
-import {Move} from "@/app/Move";
-import {Color} from "@/app/utils";
+import {Color, Move} from "@/app/bitboardHelpers";
 
 
 export class Engine {
 	chessGame: Chess | null = null;
-	color: Color | null = null;
+	color: Color = Color.White;
 
 	constructor(game: Chess | undefined, color: Color | undefined)
 	constructor(game?: Chess, color?: Color) {

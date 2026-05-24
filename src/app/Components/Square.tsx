@@ -1,8 +1,7 @@
-import {Piece} from "@/app/utils";
 import {useDrag, useDrop} from "react-dnd";
 import {useEffect} from "react";
 import {pieceSymbols} from "@/app/utils";
-import {getEmptyImage} from "react-dnd-html5-backend";
+import {Piece, pieceColor, pieceName, squareIndex} from "@/app/bitboardHelpers";
 
 export default function Square({ movePieceHere, row, col, squareDim, white, piece, setIsMouseDown, onDrag, highlight, disabled }: { movePieceHere: (row: number, col: number) => void, row: number, col: number, squareDim: number, white: boolean, piece: Piece | null, setIsMouseDown: (isDown: boolean) => void, onDrag: () => void, highlight: "none" | "possible" | "danger", disabled: boolean }) {
 	const WHITE = "#f0d9b5";
@@ -37,7 +36,7 @@ export default function Square({ movePieceHere, row, col, squareDim, white, piec
 		// dragPreview(img, { captureDraggingState: true });
 
 		const img = new Image();
-		img.src = pieceSymbols[piece.name][piece.color];
+		img.src = pieceSymbols[pieceName(piece)][pieceColor(piece)];
 
 		// ChatGPTed the scaling and centering logic
 		img.onload = () => {
@@ -75,13 +74,15 @@ export default function Square({ movePieceHere, row, col, squareDim, white, piec
 
 	return (
 		<div ref={(node) => {drop(drag(node))}} style={squareStyle}>
-			<div className="w-full h-full flex items-center justify-center" style={{
+			<div className="relative w-full h-full flex items-center justify-center" style={{
 				backgroundColor: highlight === "danger" ? "rgba(181,0,0,0.75)" : highlight === "possible" ? 'rgba(255,244,0,0.25)' :  "transparent", opacity: isDragging ? 0.25 : 1, cursor: "move",
 				boxShadow: isOver ? (highlight !== "none" ? "inset 0 0 0 4px rgb(0, 255, 255)" : "inset 0 0 0 4px rgb(255, 0, 0)") : "none"
 			}}>
 				{
-					piece === null ? null : <img width={squareDim-squarePadding} src={pieceSymbols[piece.name][piece.color]} draggable={!disabled}/>
+					piece === null ? null : <img width={squareDim-squarePadding} src={pieceSymbols[pieceName(piece)][pieceColor(piece)]} draggable={!disabled}/>
 				}
+
+				<p className="absolute font-mono bottom-0 right-0 text-sm text-black">{squareIndex(row, col)}</p>
 			</div>
 		</div>
 	);

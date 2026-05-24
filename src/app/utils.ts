@@ -1,18 +1,44 @@
-import {Move} from "@/app/Move";
 import {Engine} from "@/app/engines/Engine";
 import Engine_v1 from "@/app/engines/Engine_v1";
 import Engine_v2 from "@/app/engines/Engine_v2";
 import Engine_v3 from "@/app/engines/Engine_v3";
+import Engine_v4 from "@/app/engines/Engine_v4";
+import {Color, makePiece, Move, Piece, PieceName} from "@/app/bitboardHelpers";
+import {moveFromCol, moveFromRow, moveToCol, moveToRow} from "@/app/Move";
+import Engine_v5 from "@/app/engines/Engine_v5";
 
-export type Color = "W" | "B";
-
-export type PieceName = "King" | "Queen" | "Rook" | "Bishop" | "Knight" | "Pawn";
-export interface Piece {
-	name: PieceName;
-	color: Color;
+export interface GameDetails {
+	state: GameState;
+	winner: Color | null;
 }
 
-export type EngineVersion = "1" | "2" | "3";
+export enum GameState {
+	Running = "Running",
+	Checkmate = "Checkmate",
+	Stalemate = "Stalemate",
+	Draw = "Draw",
+}
+
+export interface MoveHistoryEntry {
+	move: Move;
+	piece: Piece
+}
+
+export const pieceSymbols: { [key in PieceName]: { 0: string; 1: string } } = {
+	5: { 0: "/pieces/wk.svg", 1: "/pieces/bk.svg" },
+	4: { 0: "/pieces/wq.svg", 1: "/pieces/bq.svg" },
+	3: { 0: "/pieces/wr.svg", 1: "/pieces/br.svg" },
+	2: { 0: "/pieces/wb.svg", 1: "/pieces/bb.svg" },
+	1: { 0: "/pieces/wn.svg", 1: "/pieces/bn.svg" },
+	0: { 0: "/pieces/wp.svg", 1: "/pieces/bp.svg" }
+}
+
+export function swapColor(color: Color): Color {
+	return (color+1) % 2;
+}
+
+// ENGINES
+export type EngineVersion = "1" | "2" | "3" | "4" | "5" | "6";
 export interface EngineDetail {
 	version: EngineVersion,
 	name: string,
@@ -35,80 +61,80 @@ export const allEngines: EngineDetail[] =
 			name: "Prioritize Valuable Piece Captures",
 			getEngine: () => new Engine_v3(),
 		},
+		{
+			version: "4",
+			name: "Eval board with point count",
+			getEngine: () => new Engine_v4(),
+		},
+		{
+			version: "5",
+			name: "Search v1",
+			getEngine: () => new Engine_v5(),
+		},
+		{
+			version: "6",
+			name: "Search with PST",
+			getEngine: () => new Engine_v5(),
+		},
 	];
 
 export function getEngineDetail(ver: string) {
 	return allEngines.find(e => e.version === ver) ?? null;
 }
 
-export type Board = (Piece | null)[][];
-export interface GameDetails {
-	state: GameState;
-	winner: Color | null;
-}
-export type GameState = "running" | "checkmate" | "stalemate" | "draw"
-export interface MoveHistoryEntry {
-	move: Move;
-	piece: Piece
-}
-
-export const pieceSymbols: { [key in PieceName]: { W: string; B: string } } = {
-	"King":   { W: "/pieces/wk.svg", B: "/pieces/bk.svg" },
-	"Queen":  { W: "/pieces/wq.svg", B: "/pieces/bq.svg" },
-	"Rook":   { W: "/pieces/wr.svg", B: "/pieces/br.svg" },
-	"Bishop": { W: "/pieces/wb.svg", B: "/pieces/bb.svg" },
-	"Knight": { W: "/pieces/wn.svg", B: "/pieces/bn.svg" },
-	"Pawn":   { W: "/pieces/wp.svg", B: "/pieces/bp.svg" }
-}
-
-export function swapColor(color: Color): Color {
-	return color === "W" ? "B" : "W";
-}
-
-// Piece generators
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function randomPiece(_rank: number, _file: number): Piece {
-	const pieceNames: PieceName[] = ["King", "Queen", "Rook", "Bishop", "Knight", "Pawn"];
-	const colors: Color[] = ["W", "B"];
-	const randomName = pieceNames[Math.floor(Math.random() * pieceNames.length)];
-	const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-	return { name: randomName, color: randomColor };
-}
-
-export function randomPieceOrEmpty(_rank: number, _file: number): Piece | null {
-	const pieceNames: (PieceName | null)[] = ["King", "Queen", "Rook", "Bishop", "Knight", "Pawn", null];
-	const colors: Color[] = ["W", "B"];
-	const randomName = pieceNames[Math.floor(Math.random() * pieceNames.length)];
-	if (randomName === null) return null;
-
-	const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-	return { name: randomName, color: randomColor };
-}
 
 export function standardChessSetup(rank: number, file: number): Piece | null {
-	const pieceOrder: PieceName[] = ["Rook", "Knight", "Bishop", "Queen", "King", "Bishop", "Knight", "Rook"];
+	const pieceOrder: PieceName[] = [
+		PieceName.Rook,
+		PieceName.Knight,
+		PieceName.Bishop,
+		PieceName.Queen,
+		PieceName.King,
+		PieceName.Bishop,
+		PieceName.Knight,
+		PieceName.Rook
+	];
 
 	if (rank === 0) {
-		return { name: pieceOrder[file], color: "B" };
+		return makePiece(pieceOrder[file], Color.White);
 	} else if (rank === 1) {
-		return { name: "Pawn", color: "B" };
+		return makePiece(PieceName.Pawn, Color.White);
 	} else if (rank === 6) {
-		return { name: "Pawn", color: "W" };
+		return makePiece(PieceName.Pawn, Color.Black);
 	} else if (rank === 7) {
-		return { name: pieceOrder[file], color: "W" };
+		return makePiece(pieceOrder[file], Color.Black);
 	} else {
 		return null;
 	}
 }
 
+// export function countPoints(board: Board, color: string): number {
+// 	const pieceValues: { [key: string]: number } = {
+// 		"Pawn": 1,
+// 		"Knight": 3,
+// 		"Bishop": 3,
+// 		"Rook": 5,
+// 		"Queen": 9,
+// 		"King": 0
+// 	};
+//
+// 	let totalPoints = 0;
+// 	for (const rank of board) {
+// 		for (const piece of rank) {
+// 			if (piece && piece.color === color) {
+// 				totalPoints += pieceValues[piece.name] || 0;
+// 			}
+// 		}
+// 	}
+// 	return totalPoints;
+// }
+
 export function moveToNotation(move: Move): string {
 	const files = "abcdefgh";
-	const fromFile = files[move.fromCol];
-	const fromRank = 8 - move.fromRow;
-	const toFile = files[move.toCol];
-	const toRank = 8 - move.toRow;
+	const fromFile = files[moveFromCol(move)];
+	const fromRank = 8 - moveFromRow(move);
+	const toFile = files[moveToCol(move)];
+	const toRank = 8 - moveToRow(move);
 
 	return `${fromFile}${fromRank}${toFile}${toRank}`;
 }

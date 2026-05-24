@@ -1,10 +1,70 @@
-import {Board, GameDetails, GameState, MoveHistoryEntry, Piece, swapColor} from "@/app/utils";
-import {Color} from "./utils";
+import {GameDetails, GameState, MoveHistoryEntry, standardChessSetup, swapColor} from "@/app/utils";
 import {
-	generatePseudoBishopMoves, generatePseudoKingMoves, generatePseudoKnightMoves,
-	generatePseudoPawnMoves, generatePseudoRookMoves,
+	generatePseudoBishopMoves,
+	generatePseudoKingMoves,
+	generatePseudoKnightMoves,
+	generatePseudoPawnMoves,
+	generatePseudoRookMoves,
+	GeneratorContext,
 } from "@/app/validators";
-import {Move} from "@/app/Move";
+import {
+	Board,
+	Color, colorOccupancy,
+	lsb,
+	makeEmptyBoard,
+	makePiece,
+	Move,
+	Piece,
+	pieceColor,
+	PieceName,
+	pieceName,
+	popcount,
+	squareIndex,
+	squareMask, u64,
+} from "@/app/bitboardHelpers";
+import {
+	disectMove,
+	isCaptureMove,
+	isCastleMove,
+	isEnPassantMove,
+	isPromotionMove, moveCaptured,
+	movePromotion,
+	moveToCol,
+	moveToRow, moveToSq
+} from "@/app/Move";
+
+// --- Board read/write ---
+
+/**
+ * Returns the Piece enum value on a given square, or null if empty.
+ */
+export function getBoardSquare(board: Board, sq: number): Piece | null {
+	const mask = squareMask(sq);
+	for (let p = 0; p < 12; p++) {
+		if (board[p] & mask) return p as Piece;
+	}
+	return null;
+}
+
+/**
+ * Clears all pieces from a square.
+ */
+function clearSquare(board: Board, sq: number): void {
+	const mask = squareMask(sq);
+	for (let p = 0; p < 12; p++) {
+		board[p] = u64(board[p] & u64(~mask));
+	}
+}
+
+/**
+ * Sets a square to a piece (clearing whatever was there first).
+ */
+function setSquare(board: Board, sq: number, piece: Piece | null): void {
+	clearSquare(board, sq);
+	if (piece !== null) {
+		board[piece] |= squareMask(sq);
+	}
+}
 
 export class Chess {
 	private board: Board;
@@ -12,416 +72,420 @@ export class Chess {
 	private numFiles: number;
 	private moveHistory: MoveHistoryEntry[];
 	private gameDetails: GameDetails;
+	private materialScore: number = 0; // positive = white advantage
 
+	private static readonly PIECE_VALUE: Record<PieceName, number> = {
+		[PieceName.Pawn]:   100,
+		[PieceName.Knight]: 320,
+		[PieceName.Bishop]: 330,
+		[PieceName.Rook]:   500,
+		[PieceName.Queen]:  900,
+		[PieceName.King]:   0,
+	};
 
-	private kingSideCastleRights: {
-		[key in Color]: boolean
-	} = { W: true, B: true };
-	private queenSideCastleRights: {
-		[key in Color]: boolean
-	} = { W: true, B: true };
+	private kingSideCastleRights:  { [key in Color]: boolean } = { [Color.White]: true,  [Color.Black]: true };
+	private queenSideCastleRights: { [key in Color]: boolean } = { [Color.White]: true,  [Color.Black]: true };
 
-	private currentTurn: Color = "W";
+	private currentTurn: Color = Color.White;
 
-	constructor(
-		ranks: number,
-		files: number,
-		board?: Board,
-	) {
+	constructor(ranks: number, files: number, board?: Board) {
 		this.numRanks = ranks;
 		this.numFiles = files;
-		this.board = board ?
-			board.map(row => row.slice()) :
-			Array.from({length: ranks}, () => Array(files).fill(null));
-
+		this.board = board ?? this.generateBoard(ranks, files);
 		this.moveHistory = [];
-		this.currentTurn = "W";
-		this.gameDetails = {
-			state: "running",
-			winner: null
-		};
+		this.currentTurn = Color.White;
+		this.gameDetails = { state: GameState.Running, winner: null };
+		this.materialScore = this.computeMaterialScore();
 	}
 
 	// GETTERS #########################################################################################################
-	getBoard() {
-		return this.board.map(row => row.slice());
+
+	getBoard(): Board {
+		return new BigInt64Array(this.board) as Board;
 	}
 
 	getSquare(row: number, col: number): Piece | null {
 		if (row < 0 || row >= this.numRanks || col < 0 || col >= this.numFiles) return null;
-
-		return this.board[row][col];
+		return getBoardSquare(this.board, squareIndex(row, col));
 	}
 
-	getRanks(): number {
-		return this.numRanks;
-	}
-
-	getFiles(): number {
-		return this.numFiles;
-	}
-
-	getHistory() {
-		return [...this.moveHistory];
-	}
-
-	getTurn(): Color {
-		return this.currentTurn;
-	}
-
-	getGameDetails(): GameDetails {
-		return this.gameDetails;
-	}
+	getRanks(): number { return this.numRanks; }
+	getFiles(): number { return this.numFiles; }
+	getHistory() { return [...this.moveHistory]; }
+	getTurn(): Color { return this.currentTurn; }
+	getGameDetails(): GameDetails { return this.gameDetails; }
 
 	// SETTERS #########################################################################################################
-	nextTurn(): Chess {
-		this.currentTurn = this.currentTurn === "W" ? "B" : "W";
 
+	nextTurn(): Chess {
+		this.currentTurn = this.currentTurn === Color.White ? Color.Black : Color.White;
 		return this;
 	}
 
-	setBoard(b: Board) {
+	setBoard(b: Board): void {
 		this.board = b;
+		this.materialScore = this.computeMaterialScore();
 	}
 
-	setSquare(row: number, col: number, piece: Piece | null) {
-		if (row < 0 || row >= this.numRanks || col < 0 || col >= this.numFiles) return this;
+	setSquare(row: number, col: number, piece: Piece | null): void {
+		if (row < 0 || row >= this.numRanks || col < 0 || col >= this.numFiles) return;
 
-		this.board[row][col] = piece;
+		// Update material score incrementally
+		const existing = getBoardSquare(this.board, squareIndex(row, col));
+		if (existing !== null) this.adjustMaterial(existing, -1);
+		if (piece  !== null) this.adjustMaterial(piece,    +1);
+
+		setSquare(this.board, squareIndex(row, col), piece);
 	}
 
-	addHistoryEntry(entry: MoveHistoryEntry) {
+	addHistoryEntry(entry: MoveHistoryEntry): void {
 		this.moveHistory.push(entry);
 	}
 
+	// MATERIAL ########################################################################################################
+
+	private adjustMaterial(piece: Piece, sign: 1 | -1): void {
+		const value = Chess.PIECE_VALUE[pieceName(piece)];
+		this.materialScore += sign * (pieceColor(piece) === Color.White ? value : -value);
+	}
+
+	private computeMaterialScore(): number {
+		let score = 0;
+		for (let p = 0; p < 12; p++) {
+			const value = Chess.PIECE_VALUE[pieceName(p as Piece)];
+			const sign  = pieceColor(p as Piece) === Color.White ? 1 : -1;
+			score += sign * value * popcount(this.board[p]);
+		}
+		return score;
+	}
+
+	countPoints(color: Color): number {
+		// Return the absolute material total for one side (no sign)
+		let score = 0;
+		const base = color * 6;
+		for (let i = 0; i < 6; i++) {
+			score += Chess.PIECE_VALUE[i as PieceName] * popcount(this.board[base + i]);
+		}
+		return score;
+	}
+
 	// CHESS FUNCTIONS #################################################################################################
-	/**
-	 * Validate a move, then apply it to the board if valid.
-	 * @param move
-	 * @returns A boolean indicating whether the move was successful.
-	 */
-	move(move: Move): { ok: true, enrichedMove: Move } | { ok: false } {
-		const {fromRow, fromCol, toRow, toCol} = move;
+
+	move(move: Move): { ok: true; enrichedMove: Move } | { ok: false } {
+		const { fromRow, fromCol, toRow, toCol } = disectMove(move);
 
 		if (
-			fromRow == toRow && fromCol == toCol ||
+			fromRow === toRow && fromCol === toCol ||
 			fromRow < 0 || fromRow >= this.numRanks ||
 			fromCol < 0 || fromCol >= this.numFiles ||
 			this.getSquare(fromRow, fromCol) === null
 		) return { ok: false };
 
 		const movingPiece = this.getSquare(fromRow, fromCol)!;
-		if (movingPiece.color !== this.currentTurn) return { ok: false }; // Incorrect turn
+		if (pieceColor(movingPiece) !== this.currentTurn) return { ok: false };
 
-		// Check for move validity
 		const moveValidation = this.validateMove(move, true);
 		if (!moveValidation.valid) return { ok: false };
 
-		// capture the piece at destination BEFORE applying the move so we can
-		// correctly update castling rights if a rook was captured
 		const capturedPieceBefore = this.getSquare(toRow, toCol);
-
-		// Make the move
 		const enrichedMove = moveValidation.enrichedMove;
 		this.makeMove(enrichedMove);
 		this.addHistoryEntry({ move: enrichedMove, piece: movingPiece });
 
 		// Update castling rights
-		if (movingPiece.name === "King") { // If king moves, lose both castling rights
-			this.kingSideCastleRights[movingPiece.color] = false;
-			this.queenSideCastleRights[movingPiece.color] = false;
-		} else if (movingPiece.name === "Rook") { // If a rook moves, lose that side's castling right
-			if (fromCol === 0) this.queenSideCastleRights[movingPiece.color] = false;
-			else if (fromCol === this.numFiles - 1) this.kingSideCastleRights[movingPiece.color] = false;
-		} else if (enrichedMove.isCaptureMove()) { // If a rook is captured, lose that side's castling right
-			const capturedPiece = capturedPieceBefore;
-			if (capturedPiece && capturedPiece.name === "Rook") {
-				if (toCol === 0) this.queenSideCastleRights[capturedPiece.color] = false;
-				else if (toCol === this.numFiles - 1) this.kingSideCastleRights[capturedPiece.color] = false;
+		const mName = pieceName(movingPiece);
+		const mColor = pieceColor(movingPiece);
+		if (mName === PieceName.King) {
+			this.kingSideCastleRights[mColor]  = false;
+			this.queenSideCastleRights[mColor] = false;
+		} else if (mName === PieceName.Rook) {
+			if (fromCol === 0)                 this.queenSideCastleRights[mColor] = false;
+			else if (fromCol === this.numFiles - 1) this.kingSideCastleRights[mColor] = false;
+		} else if (isCaptureMove(enrichedMove) && capturedPieceBefore !== null) {
+			if (pieceName(capturedPieceBefore) === PieceName.Rook) {
+				const capColor = pieceColor(capturedPieceBefore);
+				if (toCol === 0)                      this.queenSideCastleRights[capColor] = false;
+				else if (toCol === this.numFiles - 1) this.kingSideCastleRights[capColor]  = false;
 			}
 		}
 
-		if (this.isMate(swapColor(movingPiece.color)) !== "running") {
-			this.gameDetails.state = this.isMate(swapColor(movingPiece.color));
-			this.gameDetails.winner = this.gameDetails.state === "checkmate" ? movingPiece.color : null;
+		const opponentColor = swapColor(mColor);
+		const mateState = this.isMate(opponentColor);
+		if (mateState !== GameState.Running) {
+			this.gameDetails.state  = mateState;
+			this.gameDetails.winner = mateState === GameState.Checkmate ? mColor : null;
 		} else if (this.checkInsufficientMaterial()) {
-			this.gameDetails.state = "draw";
+			this.gameDetails.state  = GameState.Draw;
 			this.gameDetails.winner = null;
 		}
 
 		return { ok: true, enrichedMove };
 	}
 
-	/**
-	 * Executes the move on the board without any validation.
-	 * @param move
-	 */
 	makeMove(move: Move): { ok: boolean } {
-		const {fromRow, fromCol, toRow, toCol} = move;
-		const movingPiece = this.getSquare(move.fromRow, move.fromCol);
-		if (!movingPiece) return { ok: false };
+		const { fromRow, fromCol, toRow, toCol } = disectMove(move);
 
-		if (move.isPromotionMove()) {
-			this.setSquare(toRow, toCol, move.getPromotionPiece());
-			this.setSquare(fromRow, fromCol, null);
-			return { ok: true };
+		const movingPiece = this.getSquare(fromRow, fromCol);
+		if (movingPiece === null) return { ok: false };
+
+		// 1. Handle special board wipes before placing the moving piece
+		if (isEnPassantMove(move)) {
+			// A White pawn captures moving "up" (increasing rows), so the victim is 1 row behind the landing square
+			const victimRow = pieceColor(movingPiece) === Color.White ? toRow - 1 : toRow + 1;
+			this.setSquare(victimRow, toCol, null);
 		}
-
-		if (move.isEnPassantMove()) {
-			const epRow = movingPiece?.color === "W" ? toRow + 1 : toRow - 1;
-			this.setSquare(epRow, toCol, null); // Remove the captured pawn
-		}
-
-		if (move.isCastleMove()) {
+		else if (isCastleMove(move)) {
 			if (toCol === fromCol + 2) {
-				// King-side castle
+				// King-side
 				const rook = this.getSquare(fromRow, this.numFiles - 1);
-				if (rook && rook.name === "Rook" && rook.color === movingPiece.color) {
+				if (rook !== null && pieceName(rook) === PieceName.Rook && pieceColor(rook) === pieceColor(movingPiece)) {
 					this.setSquare(fromRow, fromCol + 1, rook);
 					this.setSquare(fromRow, this.numFiles - 1, null);
 				}
 			} else if (toCol === fromCol - 2) {
-				// Queen-side castle
+				// Queen-side
 				const rook = this.getSquare(fromRow, 0);
-				if (rook && rook.name === "Rook" && rook.color === movingPiece.color) {
+				if (rook !== null && pieceName(rook) === PieceName.Rook && pieceColor(rook) === pieceColor(movingPiece)) {
 					this.setSquare(fromRow, fromCol - 1, rook);
 					this.setSquare(fromRow, 0, null);
 				}
 			}
 		}
 
-		this.setSquare(toRow, toCol, movingPiece);
-		this.setSquare(fromRow, fromCol, null);
+		// 2. Resolve destination piece placement (Handles standard moves, promotions, and captures cleanly)
+		if (isPromotionMove(move)) {
+			this.setSquare(toRow, toCol, movePromotion(move));
+		} else {
+			this.setSquare(toRow, toCol, movingPiece);
+		}
 
+		// 3. Always clear the origin square
+		this.setSquare(fromRow, fromCol, null);
 		return { ok: true };
 	}
 
-	/**
-	 * Generates all moves for a given color. The moves returned have flags attached.
-	 * @param color
-	 * @param legal - If true, only returns legal moves; if false, returns pseudo-legal moves.
-	 */
-	generateAllMoves(color: Color, legal: boolean): Move[] {
-		const allMoves: Move[] = [];
-		for (let r = 0; r < this.numRanks; r++) {
-			for (let c = 0; c < this.numFiles; c++) {
-				const piece = this.getSquare(r, c);
-				if (piece && piece.color === color) {
-					const pieceMoves = this.generateMoves(r, c, legal);
-					allMoves.push(...pieceMoves);
-				}
+	// TODO: does this restore castling rights?
+	unmakeMove(move: Move): void {
+		const { fromRow, fromCol, toRow, toCol } = disectMove(move);
+
+		let movingPiece = this.getSquare(toRow, toCol);
+		if (movingPiece === null) {
+			throw new Error(`No piece to unmove at [${toRow}, ${toCol}] from move: ${move}`);
+		}
+
+		this.nextTurn(); // Toggle the active color flag back
+
+		// 1. Reset the moving piece back to its original pawn state if it was promoted
+		if (isPromotionMove(move)) {
+			movingPiece = makePiece(PieceName.Pawn, pieceColor(movingPiece));
+		}
+
+		this.setSquare(fromRow, fromCol, movingPiece);
+		this.setSquare(toRow, toCol, null); // Clear the landing pad by default
+
+		// 2. Restore captured pieces onto their exact locations
+		if (isEnPassantMove(move)) {
+			// Exact match calculation: White pawn moving up captured a piece 1 row below the target square
+			const victimRow = pieceColor(movingPiece) === Color.White ? toRow - 1 : toRow + 1;
+			this.setSquare(victimRow, toCol, makePiece(PieceName.Pawn, swapColor(pieceColor(movingPiece))));
+		}
+		else if (isCaptureMove(move)) {
+			const captured = moveCaptured(move);
+			if (captured !== null) {
+				this.setSquare(toRow, toCol, captured); // Put captured piece back safely
 			}
 		}
 
+		// 3. Restore Castling Rook positions back to corners
+		if (isCastleMove(move)) {
+			if (toCol === fromCol + 2) {
+				// King-side
+				this.setSquare(fromRow, fromCol + 1, null);
+				this.setSquare(fromRow, this.numFiles - 1, makePiece(PieceName.Rook, pieceColor(movingPiece)));
+			} else if (toCol === fromCol - 2) {
+				// Queen-side
+				this.setSquare(fromRow, fromCol - 1, null);
+				this.setSquare(fromRow, 0, makePiece(PieceName.Rook, pieceColor(movingPiece)));
+			}
+		}
+	}
+
+	generateAllMoves(color: Color, legal: boolean): Move[] {
+		const allMoves: Move[] = [];
+		// Iterate only over squares occupied by this color
+		let occ = colorOccupancy(this.board, color);
+
+		while (occ > 0n) {
+			const sq = lsb(occ);
+			occ &= occ - 1n; // clear LSB
+			const row = Number(sq) >> 3;
+			const col = Number(sq) & 7;
+			// console.log("Generating all moves; now @ square:", Number(sq));
+
+			allMoves.push(...this.generateMoves(row, col, legal));
+		}
 		return allMoves;
 	}
 
-	/**
-	 * Generates all moves for a piece at a given position. The moves returned have flags attached.
-	 * @param fromRow
-	 * @param fromCol
-	 * @param legal - If true, only returns legal moves; if false, returns pseudo-legal moves.
-	 */
 	generateMoves(fromRow: number, fromCol: number, legal: boolean): Move[] {
-		const movingPiece = this.getSquare(fromRow, fromCol);
-		if (!movingPiece) return [];
+		const fromSq = squareIndex(fromRow, fromCol);
+		// console.log("Generating moves for square:", fromSq)
 
-		const generatorCtx = {
+		const movingPiece = this.getSquare(fromRow, fromCol);
+		if (movingPiece === null) return [];
+
+		const generatorCtx: GeneratorContext = {
 			board: this.board,
 			moveHistory: this.moveHistory,
-			numRanks: this.numRanks,
 			castlingRights: {
-				kingSide: this.kingSideCastleRights[movingPiece.color],
-				queenSide: this.queenSideCastleRights[movingPiece.color]
-			}
-		}
+				kingSide:  this.kingSideCastleRights[pieceColor(movingPiece)],
+				queenSide: this.queenSideCastleRights[pieceColor(movingPiece)],
+			},
+		};
 
+		const color = pieceColor(movingPiece);
 		let pseudoLegalMoves: Move[] = [];
-		switch (movingPiece.name) {
-			case "Pawn":
-				pseudoLegalMoves = generatePseudoPawnMoves(fromRow, fromCol, movingPiece.color, generatorCtx);
+
+		switch (pieceName(movingPiece)) {
+			case PieceName.Pawn:
+				pseudoLegalMoves = generatePseudoPawnMoves(fromSq, color, generatorCtx);
 				break;
-			case "Rook":
-				pseudoLegalMoves = generatePseudoRookMoves(fromRow, fromCol, movingPiece.color, generatorCtx);
+			case PieceName.Rook:
+				pseudoLegalMoves = generatePseudoRookMoves(fromSq, color, generatorCtx);
 				break;
-			case "Bishop":
-				pseudoLegalMoves = generatePseudoBishopMoves(fromRow, fromCol, movingPiece.color, generatorCtx);
+			case PieceName.Bishop:
+				pseudoLegalMoves = generatePseudoBishopMoves(fromSq, color, generatorCtx);
 				break;
-			case "Knight":
-				pseudoLegalMoves = generatePseudoKnightMoves(fromRow, fromCol, movingPiece.color, generatorCtx);
+			case PieceName.Knight:
+				pseudoLegalMoves = generatePseudoKnightMoves(fromSq, color, generatorCtx);
 				break;
-			case "King":
-				pseudoLegalMoves = generatePseudoKingMoves(fromRow, fromCol, movingPiece.color, generatorCtx);
+			case PieceName.King:
+				pseudoLegalMoves = generatePseudoKingMoves(fromSq, color, generatorCtx);
 				break;
-			case "Queen":
-				pseudoLegalMoves = generatePseudoRookMoves(fromRow, fromCol, movingPiece.color, generatorCtx)
-					.concat(generatePseudoBishopMoves(fromRow, fromCol, movingPiece.color, generatorCtx));
+			case PieceName.Queen:
+				pseudoLegalMoves = [
+					...generatePseudoRookMoves(fromSq, color, generatorCtx),
+					...generatePseudoBishopMoves(fromSq, color, generatorCtx),
+				];
 				break;
-			default:
 		}
 
-		// Only check for pseudo-legality
 		if (!legal) return pseudoLegalMoves;
 
-		const legalMoves: Move[] = [];
-		// Ensure this move doesn't put own king in check
-		for (const moveToVerify of pseudoLegalMoves)
-		{
-			const simulatedGame = this.copy();
-			simulatedGame.makeMove(moveToVerify);
-			if (!simulatedGame.isInCheck(movingPiece.color)) legalMoves.push(moveToVerify);
-		}
-
-		return legalMoves;
+		return pseudoLegalMoves.filter(m => {
+			const sim = this.copy();
+			sim.makeMove(m);
+			return !sim.isInCheck(color);
+		});
 	}
 
-	/**
-	 * Validate the given move
-	 * @param move
-	 * @param legal - If true, checks for legality (including check); if false, only checks for pseudo-legality.
-	 */
-	validateMove(move: Move, legal: boolean): { valid: true, enrichedMove: Move } | { valid: false } {
-		const {fromRow, fromCol, toRow, toCol} = move;
+	validateMove(move: Move, legal: boolean): { valid: true; enrichedMove: Move } | { valid: false } {
+		const { fromRow, fromCol, toRow, toCol } = disectMove(move);
 		const movingPiece = this.getSquare(fromRow, fromCol);
-		if (!movingPiece) return { valid: false }; // No piece to move
+		if (movingPiece === null) return { valid: false };
 
-		if (this.getSquare(toRow, toCol)?.color === movingPiece.color) return { valid: false,  }; // No cannibalism...
-		// I'm pretty sure ^^ is already checked in the individual piece validators but whatever
+		const dest = this.getSquare(toRow, toCol);
+		if (dest !== null && pieceColor(dest) === pieceColor(movingPiece)) return { valid: false };
 
 		const possibleMoves = this.generateMoves(fromRow, fromCol, legal);
-		const moveMade = possibleMoves.filter(m => m.toRow === toRow && m.toCol === toCol);
+		const matched = possibleMoves.filter(m => moveToRow(m) === toRow && moveToCol(m) === toCol);
 
-		if (moveMade.length === 0) return { valid: false };
-		if (moveMade.length === 1) return { valid: true, enrichedMove: moveMade[0] };
+		if (matched.length === 0) return { valid: false };
+		if (matched.length === 1) return { valid: true, enrichedMove: matched[0] };
 
-		// Multiple moves found (e.g., promotions)
-		const promotionMove = moveMade.find(m => m.getPromotionPiece()?.name === move.getPromotionPiece()?.name);
-		if (!promotionMove) {
-			throw new Error("Multiple moves found but none match the promotion piece.");
-			// return { valid: false };
-		}
+		// more than one move found; must be promotion ambiguity
+		const promotionMove = matched.find(
+			m => movePromotion(move) === movePromotion(m)
+		);
+		console.log(matched.map(m => `${m} ${moveToSq(m)} ${movePromotion(m)}`), `${move} ${moveToSq(move)} ${movePromotion(move)}`, promotionMove)
+		if (!promotionMove) throw new Error("Multiple moves found but none match the promotion piece.");
 		return { valid: true, enrichedMove: promotionMove };
 	}
 
 	isInCheck(color: Color): boolean {
-		const kingPosition = this.findKing(color);
-		if (!kingPosition) return true;
+		const kingPos = this.findKing(color);
+		if (!kingPos) return true;
 
-		const opponentColor: Color = color === "W" ? "B" : "W";
-		const opponentMoves = this.generateAllMoves(opponentColor, false);
-
-		return opponentMoves.some(move => move.toRow === kingPosition!.row && move.toCol === kingPosition!.col);
+		const opponentColor: Color = color === Color.White ? Color.Black : Color.White;
+		return this.generateAllMoves(opponentColor, false)
+			.some(m => moveToRow(m) === kingPos.row && moveToCol(m) === kingPos.col);
 	}
 
+	// FIXME: USE ENUMS
 	isMate(color: Color): Exclude<GameState, "draw"> {
-		const hasKing = this.hasPiece({name: "King", color: color});
-		if (!hasKing) return "checkmate";
+		if (!this.hasPiece(makePiece(PieceName.King, color))) return GameState.Checkmate;
 
+		// console.log("Checking for mate by generating all possible moves for color", color);
 		const allMoves = this.generateAllMoves(color, true);
+		// console.log(allMoves)
 		if (allMoves.length === 0) {
-			return this.isInCheck(color) ? "checkmate" : "stalemate";
+			return this.isInCheck(color) ? GameState.Checkmate : GameState.Stalemate;
 		}
-
-		return "running";
+		return GameState.Running;
 	}
 
-	checkInsufficientMaterial(): boolean { // FIXME: Not complete
-		const pieces = this.board.flat().filter(p => p !== null) as Piece[];
-		if (pieces.length === 2) {
-			// Only kings left
-			return pieces.every(p => p.name === "King");
-		} else if (pieces.length === 3) {
-			// King and minor piece vs King
-			const minorPieces = pieces.filter(p => p.name !== "King");
-			return minorPieces.length === 1 && (minorPieces[0].name === "Bishop" || minorPieces[0].name === "Knight");
+	checkInsufficientMaterial(): boolean {
+		let totalPieces = 0;
+		const minorPieces: Piece[] = [];
+
+		for (let p = 0; p < 12; p++) {
+			const count = popcount(this.board[p]);
+			totalPieces += count;
+			const name = pieceName(p as Piece);
+			if (name === PieceName.Bishop || name === PieceName.Knight) {
+				for (let i = 0; i < count; i++) minorPieces.push(p as Piece);
+			}
+			// If there are any pawns, rooks, or queens, material is sufficient
+			if ((name === PieceName.Pawn || name === PieceName.Rook || name === PieceName.Queen) && count > 0) {
+				return false;
+			}
 		}
 
-		// there are other conditions, but FOR SIMPLICITY (im lazy)
-
+		if (totalPieces === 2) return true; // K vs K
+		if (totalPieces === 3 && minorPieces.length === 1) return true; // K+minor vs K
 		return false;
 	}
 
-
 	// UTILS ###########################################################################################################
 
-	hasPiece(piece: Piece) {
-		return this.board.flat().some(p => p?.name === piece.name && p?.color === piece.color);
+	hasPiece(piece: Piece): boolean {
+		return this.board[piece] !== 0n;
 	}
 
 	findKing(color: Color): { row: number; col: number } | null {
-		for (let r = 0; r < this.numRanks; r++) {
-			for (let c = 0; c < this.numFiles; c++) {
-				const piece = this.getSquare(r, c);
-				if (piece && piece.name === "King" && piece.color === color) {
-					return { row: r, col: c };
-				}
-			}
-		}
-		return null;
+		const kingPiece = makePiece(PieceName.King, color);
+		const bb = this.board[kingPiece];
+		if (!bb) return null;
+		const sq = Number(lsb(bb));
+		return { row: sq >> 3, col: sq & 7 };
 	}
 
-	countPoints(color: string): number {
-		const pieceValues: { [key: string]: number } = {
-			"Pawn": 1,
-			"Knight": 3,
-			"Bishop": 3,
-			"Rook": 5,
-			"Queen": 9,
-			"King": 0
-		};
-
-		let totalPoints = 0;
-		for (const rank of this.board) {
-			for (const piece of rank) {
-				if (piece && piece.color === color) {
-					totalPoints += pieceValues[piece.name] || 0;
-				}
-			}
-		}
-		return totalPoints;
-	}
-
-	// OTHER ###########################################################################################################
 	copy(): Chess {
 		const c = new Chess(this.numRanks, this.numFiles, this.getBoard());
-		c.currentTurn = this.currentTurn;
-		c.moveHistory = this.getHistory();
-
-		c.kingSideCastleRights = { ...this.kingSideCastleRights };
+		c.currentTurn         = this.currentTurn;
+		c.moveHistory         = this.getHistory();
+		c.kingSideCastleRights  = { ...this.kingSideCastleRights };
 		c.queenSideCastleRights = { ...this.queenSideCastleRights };
-		c.gameDetails = { ...this.gameDetails };
-
+		c.gameDetails         = { ...this.gameDetails };
+		c.materialScore       = this.materialScore;
 		return c;
 	}
 
 	generateBoard(
-		ranksOrGenerator: number | ((rank: number, file: number) => Piece | null),
-		files?: number,
-		generator?: (rank: number, file: number) => Piece | null
-	): Chess {
-		let ranks: number;
-		if (typeof ranksOrGenerator === "function") {
-			generator = ranksOrGenerator;
-			ranks = this.numRanks;
-			files = this.numFiles;
-		} else {
-			ranks = ranksOrGenerator;
-			files = files!;
-		}
-
-		const newBoard: Board = [];
-		for (let i = 0; i < ranks; i++) {
-			const row: (Piece | null)[] = [];
-			for (let j = 0; j < files; j++) {
-				row.push(generator ? generator(i, j) : null);
+		ranks: number,
+		files: number
+	): Board {
+		const newBoard = makeEmptyBoard();
+		for (let r = 0; r < ranks; r++) {
+			for (let f = 0; f < files; f++) {
+				const piece = standardChessSetup(r, f);
+				if (piece !== null) {
+					const sq = squareIndex(r, f);
+					newBoard[piece] |= squareMask(sq);
+				}
 			}
-			newBoard.push(row);
 		}
 
-		this.setBoard(newBoard);
-		this.numRanks = ranks;
-		this.numFiles = files;
-
-		return this;
+		return newBoard;
 	}
 }

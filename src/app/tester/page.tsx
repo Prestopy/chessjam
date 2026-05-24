@@ -1,13 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import {useEffect, useRef, useState} from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
-import { Chess } from "@/app/Chess";
-import {Board, EngineVersion, GameState, standardChessSetup, allEngines} from "@/app/utils";
-import { Color } from "@/app/utils";
+import {Chess} from "@/app/Chess";
+import {allEngines, EngineVersion, GameState} from "@/app/utils";
 import ProgressBar from "@/app/Components/ProgressBar";
 
-import { useVirtualizer } from '@tanstack/react-virtual';
-import {Move} from "@/app/Move";
+import {useVirtualizer} from '@tanstack/react-virtual';
+import {Board, Color, Move} from "@/app/bitboardHelpers";
 
 interface GameData {
 	gameState: GameState;
@@ -49,8 +48,8 @@ export default function TesterV2() {
 		const initializedBoards: Board[] = [];
 
 		for (let i = 0; i < games; i++) {
-			initializedStates.push({ gameState: "running", engines: null, winner: null, movesMade: 0, averageThinkTime: 0 });
-			initializedBoards.push(new Chess(8, 8).generateBoard(standardChessSetup).getBoard());
+			initializedStates.push({ gameState: GameState.Running, engines: null, winner: null, movesMade: 0, averageThinkTime: 0 });
+			initializedBoards.push(new Chess(8, 8).getBoard());
 		}
 
 		setGameStates(initializedStates);
@@ -80,12 +79,12 @@ export default function TesterV2() {
 					return newStates;
 				});
 
-				if (gameState !== "running") {
+				if (gameState !== GameState.Running) {
 					// check if it's the last one to complete
 					completed.current++;
 
 					if (winner) {
-						if (engine1IsWhite && winner === "W" || !engine1IsWhite && winner === "B") setEngine1Wins((prev) => prev + 1);
+						if (engine1IsWhite && winner === Color.White || !engine1IsWhite && winner === Color.Black) setEngine1Wins((prev) => prev + 1);
 						else setEngine2Wins((prev) => prev + 1);
 					}
 
@@ -165,22 +164,22 @@ export default function TesterV2() {
 
 	// MEASURING DATA
 	const completed = useRef(0);
-	const whiteWins = gameStates.filter((s) => s.winner === "W").length;
-	const blackWins = gameStates.filter((s) => s.winner === "B").length;
-	const stales = gameStates.filter((s) => s.gameState === "stalemate").length;
-	const draws = gameStates.filter((s) => s.gameState === "draw").length;
+	const whiteWins = gameStates.filter((s) => s.winner === Color.White).length;
+	const blackWins = gameStates.filter((s) => s.winner === Color.Black).length;
+	const stales = gameStates.filter((s) => s.gameState === GameState.Stalemate).length;
+	const draws = gameStates.filter((s) => s.gameState === GameState.Draw).length;
 
-	const avgPiecesLeft =
-		completed.current === 0 || (measuring && currentlyRunning)
-			? "--"
-			: (
-				chessPositions.reduce((accum, board, i) => {
-					if (gameStates[i].gameState !== "running") {
-						return accum + board.flat().filter((p) => p !== null).length;
-					}
-					return accum;
-				}, 0) / completed.current
-			).toFixed(2);
+	// const avgPiecesLeft =
+	// 	completed.current === 0 || (measuring && currentlyRunning)
+	// 		? "--"
+	// 		: (
+	// 			chessPositions.reduce((accum, board, i) => {
+	// 				if (gameStates[i].gameState !== GameState.RUNNING) {
+	// 					return accum + board.flat().filter((p) => p !== null).length;
+	// 				}
+	// 				return accum;
+	// 			}, 0) / completed.current
+	// 		).toFixed(2);
 
 	const avgMovesMadeTillEnd =
 		completed.current === 0 || (measuring && currentlyRunning)
@@ -188,7 +187,7 @@ export default function TesterV2() {
 			: (
 				(
 					gameStates.reduce((accum, state) => {
-						if (state.gameState !== "running") {
+						if (state.gameState !== GameState.Running) {
 							return accum + state.movesMade;
 						}
 						return accum;
@@ -386,10 +385,10 @@ export default function TesterV2() {
 
 				<h2 className="text-2xl font-mono font-bold mb-3 mt-10">Fun stats</h2>
 
-				<div className="flex flex-row gap-2 items-center">
-					<label className="font-bold">Average pieces left:</label>
-					<p>{avgPiecesLeft}</p>
-				</div>
+				{/*<div className="flex flex-row gap-2 items-center">*/}
+				{/*	<label className="font-bold">Average pieces left:</label>*/}
+				{/*	<p>{avgPiecesLeft}</p>*/}
+				{/*</div>*/}
 
 				<div className="flex flex-row gap-2 items-center">
 					<label className="font-bold">Average moves made:</label>
@@ -449,17 +448,17 @@ export default function TesterV2() {
 											return (
 												<div key={i} className="flex flex-col items-center justify-end">
 													{
-														gameStates[idx].gameState !== "running" ? (
+														gameStates[idx].gameState !== GameState.Running ? (
 															<div
 																className="flex flex-row justify-center w-full"
 																style={{
-																	color: gameStates[idx].winner === "W" ? "#000" : gameStates[idx].winner === "B" ? "#fff" : gameStates[idx].gameState === "stalemate" ? "#000" : "#fff",
-																	background: gameStates[idx].winner === "W" ? "#fff" : gameStates[idx].winner === "B" ? "#000" : gameStates[idx].gameState === "stalemate" ? "#ffaa00" : "#595959",
+																	color: gameStates[idx].winner === Color.White ? "#000" : gameStates[idx].winner === Color.Black ? "#fff" : gameStates[idx].gameState === GameState.Stalemate ? "#000" : "#fff",
+																	background: gameStates[idx].winner === Color.White ? "#fff" : gameStates[idx].winner === Color.Black ? "#000" : gameStates[idx].gameState === GameState.Stalemate ? "#ffaa00" : "#595959",
 																}}
 															>
 																{
-																	gameStates[idx].gameState === "stalemate" ? "Stalemate" : gameStates[idx].gameState === "draw" ? "Draw" : (
-																		<p>{gameStates[idx].winner === "W" ? "White" : "Black"} (v{gameStates[idx].engines![gameStates[idx].winner ?? "W"]}) win</p>
+																	gameStates[idx].gameState === GameState.Stalemate ? "Stalemate" : gameStates[idx].gameState === GameState.Draw ? "Draw" : (
+																		<p>{gameStates[idx].winner === Color.White ? "White" : "Black"} (v{gameStates[idx].engines![gameStates[idx].winner === Color.White ? "W" : "B"]}) win</p>
 																	)
 																}
 															</div>

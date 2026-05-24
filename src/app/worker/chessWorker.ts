@@ -1,7 +1,7 @@
 import {Chess} from "../Chess";
 import {Engine} from "../engines/Engine";
-import {Move} from "@/app/Move";
-import {Board, EngineVersion, allEngines} from "@/app/utils";
+import {allEngines, EngineVersion, GameState} from "@/app/utils";
+import {Board, Color, Move} from "@/app/bitboardHelpers";
 
 let game: Chess;
 let gameOver = false;
@@ -22,8 +22,8 @@ self.onmessage = function (e) {
 	} = e.data;
 
 	game = new Chess(ranks, files, initialBoard);
-	wEngine = allEngines.find(e => e.version === wEngineVer)?.getEngine().connectTo(game).setColor("W") ?? null;
-	bEngine = allEngines.find(e => e.version === bEngineVer)?.getEngine().connectTo(game).setColor("B") ?? null;
+	wEngine = allEngines.find(e => e.version === wEngineVer)?.getEngine().connectTo(game).setColor(Color.White) ?? null;
+	bEngine = allEngines.find(e => e.version === bEngineVer)?.getEngine().connectTo(game).setColor(Color.Black) ?? null;
 
 	setInterval(() => {
 		if (gameOver || !wEngine || !bEngine || !game) return;
@@ -32,10 +32,9 @@ self.onmessage = function (e) {
 
 		// Get move
 		const startTime = performance.now(); // Measure #####
-		if (game.getTurn() === "W") engineMove = wEngine.pickMove();
+		if (game.getTurn() === Color.White) engineMove = wEngine.pickMove();
 		else engineMove = bEngine.pickMove();
 		const endTime = performance.now();   // Measure #####
-
 
 		if (engineMove === null) {
 			callGameOver();
@@ -44,10 +43,9 @@ self.onmessage = function (e) {
 
 		game.move(engineMove);
 
-
 		// Check for game over
 		const gameDetails = game.getGameDetails();
-		if (gameDetails.state !== "running") {
+		if (gameDetails.state !== GameState.Running) {
 			callGameOver();
 			return;
 		}
@@ -55,7 +53,7 @@ self.onmessage = function (e) {
 		// Post new board
 		const timeThinking = endTime - startTime;
 		totalTimeThinking += timeThinking;
-		self.postMessage({board: game.getBoard(), winner: null, gameState: "running", movesMade: game.getHistory().length, averageThinkTime: totalTimeThinking / game.getHistory().length});
+		self.postMessage({board: game.getBoard(), winner: null, gameState: GameState.Running, movesMade: game.getHistory().length, averageThinkTime: totalTimeThinking / game.getHistory().length});
 
 		game.nextTurn();
 	}, thinkTime);

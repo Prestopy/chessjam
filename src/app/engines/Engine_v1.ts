@@ -1,7 +1,6 @@
 import {Chess} from "@/app/Chess";
 import {Engine} from "@/app/engines/Engine";
-import {Move} from "@/app/Move";
-import {Color} from "@/app/utils";
+import {Color, Move} from "@/app/bitboardHelpers";
 
 export default class Engine_v1 extends Engine {
 	constructor()
@@ -10,7 +9,7 @@ export default class Engine_v1 extends Engine {
 	}
 
 	pickMove(): Move | null {
-		if (!this.chessGame || !this.color) return null;
+		if (!this.chessGame) return null;
 		if (this.chessGame.getTurn() !== this.color) return null; // not this engine's turn
 
 		const allMoves = this.chessGame.generateAllMoves(this.color, true);
