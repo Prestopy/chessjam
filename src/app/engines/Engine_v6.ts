@@ -1,7 +1,6 @@
 import { Chess } from "@/app/Chess";
-import { Engine } from "@/app/engines/Engine";
-import { swapColor } from "@/app/utils";
-import { Color, Piece, PieceName } from "@/app/bitboardHelpers";
+import {GameStage} from "@/app/utils";
+import { Color, Piece } from "@/app/bitboardHelpers";
 import Engine_v5 from "@/app/engines/Engine_v5";
 import {PST} from "@/app/engines/pst";
 
@@ -41,45 +40,45 @@ export default class Engine_v6 extends Engine_v5 {
 
 		// --- 1. PAWNS ---
 		const whitePawns = getSquareIndices(board[Piece.WhitePawn]);
-		for (const sq of whitePawns) score += PST.midgame[Piece.WhitePawn][sq];
+		for (const sq of whitePawns) score += PST[GameStage.Midgame][Piece.WhitePawn][sq];
 
 		const blackPawns = getSquareIndices(board[Piece.BlackPawn]);
-		for (const sq of blackPawns) score -= PST.midgame[Piece.BlackPawn][sq];
+		for (const sq of blackPawns) score -= PST[GameStage.Midgame][Piece.BlackPawn][sq];
 
 		// --- 2. BISHOPS ---
 		const whiteBishops = getSquareIndices(board[Piece.WhiteBishop]);
-		for (const sq of whiteBishops) score += PST.midgame[Piece.WhiteBishop][sq];
+		for (const sq of whiteBishops) score += PST[GameStage.Midgame][Piece.WhiteBishop][sq];
 
 		const blackBishops = getSquareIndices(board[Piece.BlackBishop]);
-		for (const sq of blackBishops) score -= PST.midgame[Piece.BlackBishop][sq];
+		for (const sq of blackBishops) score -= PST[GameStage.Midgame][Piece.BlackBishop][sq];
 
 		// --- 3. KNIGHTS ---
 		const whiteKnights = getSquareIndices(board[Piece.WhiteKnight]);
-		for (const sq of whiteKnights) score += PST.midgame[Piece.WhiteKnight][sq];
+		for (const sq of whiteKnights) score += PST[GameStage.Midgame][Piece.WhiteKnight][sq];
 
 		const blackKnights = getSquareIndices(board[Piece.BlackKnight]);
-		for (const sq of blackKnights) score -= PST.midgame[Piece.BlackKnight][sq];
+		for (const sq of blackKnights) score -= PST[GameStage.Midgame][Piece.BlackKnight][sq];
 
 		// --- 4. ROOKS ---
 		const whiteRooks = getSquareIndices(board[Piece.WhiteRook]);
-		for (const sq of whiteRooks) score += PST.midgame[Piece.WhiteRook][sq];
+		for (const sq of whiteRooks) score += PST[GameStage.Midgame][Piece.WhiteRook][sq];
 
 		const blackRooks = getSquareIndices(board[Piece.BlackRook]);
-		for (const sq of blackRooks) score -= PST.midgame[Piece.BlackRook][sq];
+		for (const sq of blackRooks) score -= PST[GameStage.Midgame][Piece.BlackRook][sq];
 
 		// --- 5. QUEENS ---
 		const whiteQueens = getSquareIndices(board[Piece.WhiteQueen]);
-		for (const sq of whiteQueens) score += PST.midgame[Piece.WhiteQueen][sq];
+		for (const sq of whiteQueens) score += PST[GameStage.Midgame][Piece.WhiteQueen][sq];
 
 		const blackQueens = getSquareIndices(board[Piece.BlackQueen]);
-		for (const sq of blackQueens) score -= PST.midgame[Piece.BlackQueen][sq];
+		for (const sq of blackQueens) score -= PST[GameStage.Midgame][Piece.BlackQueen][sq];
 
 		// --- 6. KINGS ---
 		const whiteKings = getSquareIndices(board[Piece.WhiteKing]);
-		for (const sq of whiteKings) score += PST.midgame[Piece.WhiteKing][sq];
+		for (const sq of whiteKings) score += PST[GameStage.Midgame][Piece.WhiteKing][sq];
 
 		const blackKings = getSquareIndices(board[Piece.BlackKing]);
-		for (const sq of blackKings) score -= PST.midgame[Piece.BlackKing][sq];
+		for (const sq of blackKings) score -= PST[GameStage.Midgame][Piece.BlackKing][sq];
 
 		return score;
 	}

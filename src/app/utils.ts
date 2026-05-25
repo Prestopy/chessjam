@@ -12,6 +12,12 @@ export interface GameDetails {
 	winner: Color | null;
 }
 
+export enum GameStage {
+	Opening,
+	Midgame,
+	Endgame
+}
+
 export enum GameState {
 	Running = "Running",
 	Checkmate = "Checkmate",
