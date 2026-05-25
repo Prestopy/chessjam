@@ -74,7 +74,7 @@ export class Chess {
 	private gameDetails: GameDetails;
 	private materialScore: number = 0; // positive = white advantage
 
-	private phaseValue: number = 24;
+	private phaseValue: number = 24; // TODO: Should not be fixed; calculate at the start of the game
 
 	private static readonly PIECE_VALUE: Record<PieceName, number> = {
 		[PieceName.Pawn]:   100,
@@ -101,6 +101,8 @@ export class Chess {
 	}
 
 	// GETTERS #########################################################################################################
+
+	getPhaseValue(): number { return this.phaseValue; }
 
 	getBoard(): Board {
 		return new BigInt64Array(this.board) as Board;
@@ -135,9 +137,21 @@ export class Chess {
 		// Update material score incrementally
 		const existing = getBoardSquare(this.board, squareIndex(row, col));
 		if (existing !== null) {
+			// capture/piece removal
+			switch (pieceName(existing)) {
+				case PieceName.Knight: this.phaseValue -= 1; break;
+				case PieceName.Bishop: this.phaseValue -= 1; break;
+				case PieceName.Rook:   this.phaseValue -= 2; break;
+				case PieceName.Queen:  this.phaseValue -= 4; break;
+			}
+			if (this.phaseValue < 0) this.phaseValue = 0;
+
 			this.adjustMaterial(existing, -1);
 		}
-		if (piece  !== null) this.adjustMaterial(piece,    +1);
+		if (piece  !== null) {
+			// piece addition
+			this.adjustMaterial(piece,    +1);
+		}
 
 		setSquare(this.board, squareIndex(row, col), piece);
 	}
@@ -458,7 +472,6 @@ export class Chess {
 			.some(m => moveToRow(m) === kingPos.row && moveToCol(m) === kingPos.col);
 	}
 
-	// FIXME: USE ENUMS
 	isMate(color: Color): Exclude<GameState, GameState.Draw> {
 		if (!this.hasPiece(makePiece(PieceName.King, color))) return GameState.Checkmate;
 

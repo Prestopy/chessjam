@@ -1,6 +1,6 @@
 import {Chess} from "@/app/Chess";
 import {GameStage} from "@/app/utils";
-import {Color, Piece, PieceName, pieceName} from "@/app/bitboardHelpers";
+import {Color, Piece} from "@/app/bitboardHelpers";
 import Engine_v5 from "@/app/engines/Engine_v5";
 import {PST} from "@/app/engines/pst";
 
@@ -34,7 +34,14 @@ export default class Engine_v6 extends Engine_v5 {
 	}
 
 	getPST(piece: Piece) {
-		return PST[GameStage.Midgame][piece];
+		if (!this.chessGame) return PST[GameStage.Midgame][piece]; // Default to Midgame if no game context
+		const k = this.chessGame.getPhaseValue()/24; // TODO: Don't inline; calculate max in Chess.ts
+
+		const v1 = PST[GameStage.Midgame][piece];
+		const v2 = PST[GameStage.Endgame][piece];
+
+		// interpolate between mid and endgame PST
+		return v1.map((val, idx) => Math.round(val * (1 - k) + v2[idx] * k));
 	}
 
 	// Static PST evaluation (Always returns score from White's perspective)
