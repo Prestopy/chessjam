@@ -2,24 +2,11 @@
 import {useEffect, useRef, useState} from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import {Chess} from "@/app/Chess";
-import {
-	makePiece,
-	moveToNotation, pieceColor, pieceName
-} from "@/app/utils/utils";
+import {pieceColor} from "@/app/utils/utils";
 import {Engine} from "@/app/engines/Engine";
-import {
-	disectMove,
-	isCaptureMove,
-	isCastleMove,
-	moveFromCol,
-	moveFromRow, movePromotion,
-	moveToCol,
-	moveToRow,
-	setPromotionPiece
-} from "@/app/Move";
-import {Color, GameDetails, GameState, Move, Piece, PieceName} from "@/app/utils/types";
+import {isCaptureMove, isCastleMove, moveFromCol, moveFromRow, moveToCol, moveToRow} from "@/app/Move";
+import {Color, GameDetails, GameState, Move} from "@/app/utils/types";
 import {allEngines, EngineVersion, getEngineDetail} from "@/app/engines/engineDetails";
-import {pieceSymbols} from "@/app/utils/constants";
 
 export default function Home() {
 	const chessGame = useRef(new Chess(8, 8));
@@ -124,7 +111,11 @@ export default function Home() {
 	return (
 		<div className="min-w-screen min-h-screen flex flex-col items-center justify-center">
 			<h1 className="text-4xl font-mono font-bold mb-5">
-				{gameState.state === GameState.Running ? ((currentTurn === Color.White ? "WHITE" : "BLACK") + " to move") : gameState.state.toUpperCase()}
+				{gameState.state === GameState.Running ? ((currentTurn === Color.White ? "WHITE" : "BLACK") + " to move") : (
+					gameState.state === GameState.Checkmate ? "CHECKMATE" :
+						gameState.state === GameState.Stalemate ? "STALEMATE" :
+							"DRAW"
+				)}
 				{gameState.state === GameState.Checkmate ? <span className="font-normal font-small text-gray-400"> in {chessGame.current.getHistory().length} moves</span> : null}
 			</h1>
 
