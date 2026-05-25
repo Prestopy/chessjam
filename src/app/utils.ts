@@ -7,6 +7,13 @@ import {Color, makePiece, Move, Piece, PieceName} from "@/app/bitboardHelpers";
 import {moveFromCol, moveFromRow, moveToCol, moveToRow} from "@/app/Move";
 import Engine_v5 from "@/app/engines/Engine_v5";
 
+export const PHASE_WEIGHTS = {
+	[PieceName.Bishop]: 1,
+	[PieceName.Knight]: 1,
+	[PieceName.Rook]: 2,
+	[PieceName.Queen]: 4,
+}
+
 export interface GameDetails {
 	state: GameState;
 	winner: Color | null;

@@ -6,7 +6,7 @@ import {Color, makePiece, Move, MoveFlag, Piece, PieceName} from "@/app/bitboard
 // bits 17-20: captured piece (0-11, 15 = none)
 // bits 21-24: promotion piece (0-11, 15 = none)
 
-const NO_PIECE = 15;
+export const NO_PIECE = 15 as const;
 
 export function makeMove(
 	fromSq: number,
@@ -75,7 +75,8 @@ export function makeCastleMove(fromSq: number, toSq: number): Move {
 }
 
 // --- Setters ---
-export function setPromotionPiece(m: Move, promotion: Piece): Move {
+//                                                          | 15: NO_PIECE
+export function setPromotionPiece(m: Move, promotion: Piece | 15): Move {
 	const clearedMove = m & ~(0xf << 21);
 	return clearedMove | (promotion << 21) | (MoveFlag.Promotion << 12);
 }

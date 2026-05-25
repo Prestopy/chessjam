@@ -14,6 +14,7 @@ import {
 import {Engine} from "@/app/engines/Engine";
 import {Color, makePiece, Move, Piece, pieceColor, PieceName, pieceName} from "@/app/bitboardHelpers";
 import {
+	disectMove,
 	isCaptureMove,
 	isCastleMove,
 	moveFromCol,
@@ -71,25 +72,6 @@ export default function Home() {
 	const handleMove = (move: Move) => {
 		const pieceMoved = chessGame.current.getSquare(moveFromRow(move), moveFromCol(move));
 		if (pieceMoved === null) return;
-		if ((pieceMoved === Piece.WhitePawn && moveToRow(move) === 7) || (pieceMoved === Piece.BlackPawn && moveToRow(move) === 0)) {
-			if (chessGame.current.validateMove(move, true).valid) {
-				const promotionChoice = window.prompt("Promote to (Q, R, B, N):", "Q");
-				if (promotionChoice) {
-					const promoPieceName: PieceName | null = promotionChoice.toUpperCase() === "Q" ? PieceName.Queen :
-						promotionChoice.toUpperCase() === "R" ? PieceName.Rook :
-							promotionChoice.toUpperCase() === "B" ? PieceName.Bishop :
-								promotionChoice.toUpperCase() === "N" ? PieceName.Knight : null;
-					if (promoPieceName) {
-						move = setPromotionPiece(move, makePiece(promoPieceName, pieceColor(pieceMoved)));
-					}
-				}
-
-				if (movePromotion(move) === null) {
-					alert("No promotion piece/invalid promotion selected! Defaulting to Queen.");
-					move = setPromotionPiece(move, makePiece(PieceName.Queen, pieceColor(pieceMoved)));
-				}
-			}
-		}
 
 		const boardMove = chessGame.current.move(move);
 

@@ -30,7 +30,7 @@ import {
 	isPromotionMove, moveCaptured,
 	movePromotion,
 	moveToCol,
-	moveToRow, moveToSq
+	moveToRow, moveToSq, NO_PIECE, setPromotionPiece
 } from "@/app/Move";
 
 // --- Board read/write ---
@@ -73,6 +73,8 @@ export class Chess {
 	private moveHistory: MoveHistoryEntry[];
 	private gameDetails: GameDetails;
 	private materialScore: number = 0; // positive = white advantage
+
+	private phaseValue: number = 24;
 
 	private static readonly PIECE_VALUE: Record<PieceName, number> = {
 		[PieceName.Pawn]:   100,
@@ -132,7 +134,9 @@ export class Chess {
 
 		// Update material score incrementally
 		const existing = getBoardSquare(this.board, squareIndex(row, col));
-		if (existing !== null) this.adjustMaterial(existing, -1);
+		if (existing !== null) {
+			this.adjustMaterial(existing, -1);
+		}
 		if (piece  !== null) this.adjustMaterial(piece,    +1);
 
 		setSquare(this.board, squareIndex(row, col), piece);
@@ -192,7 +196,30 @@ export class Chess {
 		if (!moveValidation.valid) return { ok: false };
 
 		const capturedPieceBefore = this.getSquare(toRow, toCol);
-		const enrichedMove = moveValidation.enrichedMove;
+		let enrichedMove = moveValidation.enrichedMove;
+
+		// Check if promotion requires decision
+		if (moveValidation.requirePromotionDecision) {
+			if (isPromotionMove(enrichedMove)) {
+				const pieceMoved = this.getSquare(fromRow, fromCol)!;
+				const promotionChoice = window.prompt("Promote to (Q, R, B, N):", "Q");
+				if (promotionChoice) {
+					const promoPieceName: PieceName | null = promotionChoice.toUpperCase() === "Q" ? PieceName.Queen :
+						promotionChoice.toUpperCase() === "R" ? PieceName.Rook :
+							promotionChoice.toUpperCase() === "B" ? PieceName.Bishop :
+								promotionChoice.toUpperCase() === "N" ? PieceName.Knight : null;
+					if (promoPieceName) {
+						enrichedMove = setPromotionPiece(enrichedMove, makePiece(promoPieceName, pieceColor(pieceMoved)));
+					}
+				}
+
+				if (movePromotion(enrichedMove) === null) {
+					alert("No promotion piece/invalid promotion selected! Defaulting to Queen.");
+					enrichedMove = setPromotionPiece(enrichedMove, makePiece(PieceName.Queen, pieceColor(pieceMoved)));
+				}
+			}
+		}
+
 		this.makeMove(enrichedMove);
 
 		// Update castling rights
@@ -265,6 +292,15 @@ export class Chess {
 		// 3. Always clear the origin square
 		this.setSquare(fromRow, fromCol, null);
 		this.addHistoryEntry({ move: move, piece: movingPiece });
+
+		// 4. Update material score for captures (en passant and normal captures)
+		if (isCaptureMove(move)) {
+			const captured = moveCaptured(move);
+			if (captured !== null) {
+				this.adjustMaterial(captured, -1);
+			}
+		}
+
 		return { ok: true };
 	}
 
@@ -387,7 +423,7 @@ export class Chess {
 		});
 	}
 
-	validateMove(move: Move, legal: boolean): { valid: true; enrichedMove: Move } | { valid: false } {
+	validateMove(move: Move, legal: boolean): { valid: true; requirePromotionDecision: boolean, enrichedMove: Move } | { valid: false } {
 		const { fromRow, fromCol, toRow, toCol } = disectMove(move);
 		const movingPiece = this.getSquare(fromRow, fromCol);
 		if (movingPiece === null) return { valid: false };
@@ -399,14 +435,18 @@ export class Chess {
 		const matched = possibleMoves.filter(m => moveToRow(m) === toRow && moveToCol(m) === toCol);
 
 		if (matched.length === 0) return { valid: false };
-		if (matched.length === 1) return { valid: true, enrichedMove: matched[0] };
+		if (matched.length === 1) return { valid: true, requirePromotionDecision: false, enrichedMove: matched[0] };
 
 		// more than one move found; must be promotion ambiguity
 		const promotionMove = matched.find(
 			m => movePromotion(move) === movePromotion(m)
 		);
-		if (!promotionMove) throw new Error("Multiple moves found but none match the promotion piece.");
-		return { valid: true, enrichedMove: promotionMove };
+
+		// No choice made for promotion
+		if (!promotionMove) return { valid: true, requirePromotionDecision: true, enrichedMove: setPromotionPiece(matched[0], NO_PIECE) };
+
+		// Promotion choice made and valid
+		return { valid: true, requirePromotionDecision: false, enrichedMove: promotionMove };
 	}
 
 	isInCheck(color: Color): boolean {
