@@ -142,6 +142,10 @@ export class Chess {
 		this.moveHistory.push(entry);
 	}
 
+	popHistoryEntry(): MoveHistoryEntry | undefined {
+		return this.moveHistory.pop();
+	}
+
 	// MATERIAL ########################################################################################################
 
 	private adjustMaterial(piece: Piece, sign: 1 | -1): void {
@@ -190,7 +194,6 @@ export class Chess {
 		const capturedPieceBefore = this.getSquare(toRow, toCol);
 		const enrichedMove = moveValidation.enrichedMove;
 		this.makeMove(enrichedMove);
-		this.addHistoryEntry({ move: enrichedMove, piece: movingPiece });
 
 		// Update castling rights
 		const mName = pieceName(movingPiece);
@@ -261,6 +264,7 @@ export class Chess {
 
 		// 3. Always clear the origin square
 		this.setSquare(fromRow, fromCol, null);
+		this.addHistoryEntry({ move: move, piece: movingPiece });
 		return { ok: true };
 	}
 
@@ -310,6 +314,8 @@ export class Chess {
 				this.setSquare(fromRow, 0, makePiece(PieceName.Rook, pieceColor(movingPiece)));
 			}
 		}
+
+		this.popHistoryEntry();
 	}
 
 	generateAllMoves(color: Color, legal: boolean): Move[] {

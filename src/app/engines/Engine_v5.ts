@@ -61,7 +61,9 @@ export default class Engine_v5 extends Engine {
 
 		const simulatedGame = this.chessGame.copy();
 		for (const move of allMoves) {
-			simulatedGame.makeMove(move);
+			const moveResult = simulatedGame.makeMove(move);
+			if (!moveResult.ok) continue;
+
 			simulatedGame.nextTurn();
 
 			// Pass the running alpha down to prune alternative root moves early!
