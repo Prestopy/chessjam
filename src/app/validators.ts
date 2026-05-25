@@ -216,9 +216,9 @@ export function generatePseudoRookMoves(fromSq: number, color: Color, ctx: Gener
 
 	// --- 3. COMBINE ---
 	// Mask out the rook's standing square from the total attack set
-	const attacks = u64(verticalMoves | horizontalMoves) & u64(~sqMask);
+	const attacks = u64(verticalMoves | horizontalMoves) & not64(sqMask);
 
-	addMoves(moves, fromSq, attacks & u64(~occupied));
+	addMoves(moves, fromSq, attacks & not64(occupied));
 	addCaptureMoves(moves, fromSq, attacks & enemy, ctx.board);
 
 	return moves;
@@ -238,11 +238,11 @@ export function generatePseudoBishopMoves(fromSq: number, color: Color, ctx: Gen
 	const diagOccupancy = occupied & diagonal;
 	const antiDiagOccupancy = occupied & antiDiagonal;
 
-	const diagMoves = ((diagOccupancy - 2n * sqMask) ^ reverseBits(reverseBits(diagOccupancy) - 2n * reverseBits(sqMask))) & diagonal;
-	const antiDiagMoves = ((antiDiagOccupancy - 2n * sqMask) ^ reverseBits(reverseBits(antiDiagOccupancy) - 2n * reverseBits(sqMask))) & antiDiagonal;
-	const attacks = diagMoves | antiDiagMoves;
+	const diagMoves = (u64(diagOccupancy - 2n * sqMask) ^ reverseBits(reverseBits(u64(diagOccupancy)) - 2n * reverseBits(sqMask))) & diagonal;
+	const antiDiagMoves = (u64(antiDiagOccupancy - 2n * sqMask) ^ reverseBits(reverseBits(antiDiagOccupancy) - 2n * reverseBits(sqMask))) & antiDiagonal;
+	const attacks = u64(diagMoves | antiDiagMoves) & not64(sqMask);
 
-	addMoves(moves, fromSq, attacks & ~occupied);
+	addMoves(moves, fromSq, attacks & not64(occupied));
 	addCaptureMoves(moves, fromSq, attacks & enemy, ctx.board);
 
 	return moves;
@@ -265,7 +265,7 @@ export function generatePseudoKnightMoves(fromSq: number, color: Color, ctx: Gen
 		| sqMask >> 6n  & NOT_AB_FILE
 	);
 
-	addMoves(moves, fromSq, attacks & ~occupied);
+	addMoves(moves, fromSq, attacks & not64(occupied));
 	addCaptureMoves(moves, fromSq, attacks & enemy, ctx.board);
 
 	return moves;
@@ -275,6 +275,7 @@ export function generatePseudoKingMoves(fromSq: number, color: Color, ctx: Gener
 
 	const sqMask = squareMask(fromSq);
 	const occupied = allOccupancy(ctx.board);
+	const enemy = enemyOccupancy(ctx.board, color);
 
 	const attacks = (
 		  u64(sqMask << 9n) & NOT_A_FILE
@@ -287,8 +288,8 @@ export function generatePseudoKingMoves(fromSq: number, color: Color, ctx: Gener
 		| sqMask >> 9n & NOT_H_FILE
 	)
 
-	addMoves(moves, fromSq, attacks & ~occupied);
-	addCaptureMoves(moves, fromSq, attacks & enemyOccupancy(ctx.board, color), ctx.board);
+	addMoves(moves, fromSq, attacks & not64(occupied));
+	addCaptureMoves(moves, fromSq, attacks & enemy, ctx.board);
 
 	// Castling
 	if (ctx.castlingRights.kingSide) {

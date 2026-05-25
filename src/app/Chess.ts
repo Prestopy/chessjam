@@ -265,12 +265,14 @@ export class Chess {
 	}
 
 	// TODO: does this restore castling rights?
+	// FIXME: There are bugs where some positions can't be unmoved properly
+	// probably special moves. Check that move generators apply all necessary flags
 	unmakeMove(move: Move): void {
 		const { fromRow, fromCol, toRow, toCol } = disectMove(move);
 
 		let movingPiece = this.getSquare(toRow, toCol);
 		if (movingPiece === null) {
-			throw new Error(`No piece to unmove at [${toRow}, ${toCol}] from move: ${move}`);
+			throw new Error(`No piece to unmove at [${toRow}, ${toCol}] from move: ${move}. Board: ${JSON.stringify(this.board)}`);
 		}
 
 		this.nextTurn(); // Toggle the active color flag back
