@@ -1,7 +1,6 @@
 // --- Piece Square Tables (PST) ---
 // Index 0 = A1, Index 63 = H8
-import {Piece} from "@/app/bitboardHelpers";
-import {GameStage} from "@/app/utils";
+import {GameStage, Piece} from "@/app/utils/types";
 
 // PSTs for white.
 // WHITE SIDE UP

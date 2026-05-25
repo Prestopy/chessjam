@@ -1,4 +1,6 @@
-import {Color, makePiece, Move, MoveFlag, Piece, PieceName} from "@/app/bitboardHelpers";
+import {getBoardSquare} from "@/app/Chess";
+import {Board, Move, MoveFlag, Piece} from "@/app/utils/types";
+import {lsb} from "@/app/utils/bitUtils";
 
 // bits 0-5:   from square (0-63)
 // bits 6-11:  to square (0-63)
@@ -8,6 +10,14 @@ import {Color, makePiece, Move, MoveFlag, Piece, PieceName} from "@/app/bitboard
 
 export const NO_PIECE = 15 as const;
 
+/**
+ * Helper function to create a move integer from its components.
+ * @param fromSq
+ * @param toSq
+ * @param flags
+ * @param captured
+ * @param promotion
+ */
 export function makeMove(
 	fromSq: number,
 	toSq: number,
@@ -24,6 +34,59 @@ export function makeMove(
 	);
 }
 
+/**
+ * Helper function to add moves from a bitboard of target squares.
+ * For each set bit in bb, adds a move from (fromRow, fromCol) to the corresponding square.
+ * @param result
+ * @param fromSq
+ * @param bb
+ */
+export function addMoves(result: Move[], fromSq: number, bb: bigint) {
+	while(bb > 0n) {
+		const toSq = lsb(bb);
+		bb &= bb - 1n; // clear LSB
+
+		result.push(makeMove(fromSq, toSq))
+	}
+}
+
+/**
+ * Helper function to add moves from a bitboard of target squares.
+ * For each set bit in bb, adds a move from (fromRow, fromCol) to the corresponding square.
+ * Additionally, sets the provided flags on each move (e.g. capture, promotion).
+ * @param result
+ * @param fromSq
+ * @param bb
+ * @param flags
+ */
+export function addMovesWithFlags(result: Move[], fromSq: number, bb: bigint, flags: MoveFlag) {
+	while(bb > 0n) {
+		const toSq = lsb(bb);
+		bb &= bb - 1n; // clear LSB
+
+		result.push(makeMove(fromSq, toSq, flags))
+	}
+}
+
+/**
+ * Helper function to add capture moves from a bitboard of target squares.
+ * @param result
+ * @param fromSq
+ * @param bb
+ * @param board
+ */
+export function addCaptureMoves(result: Move[], fromSq: number, bb: bigint, board: Board) {
+	while(bb > 0n) {
+		const toSq = lsb(bb);
+		bb &= bb - 1n; // clear LSB
+
+		const piece = getBoardSquare(board, toSq);
+		if (piece === null) throw new Error('Invalid capture move; no piece found on square indicated by bitboard');
+
+		result.push(makeMove(fromSq, toSq, MoveFlag.Capture, piece))
+	}
+}
+
 // --- Decoders ---
 export function moveFromSq(m: Move):   number { return  m        & 0x3f; }
 export function moveToSq(m: Move):     number { return (m >> 6)  & 0x3f; }
@@ -34,6 +97,10 @@ export function moveFromCol(m: Move):  number { return moveFromSq(m) & 7;  }
 export function moveToRow(m: Move):    number { return moveToSq(m)   >> 3; }
 export function moveToCol(m: Move):    number { return moveToSq(m)   & 7;  }
 
+/**
+ * Helper function to extract all components of a move into an object.
+ * @param move
+ */
 export function disectMove(move: Move): { fromRow: number; fromCol: number; toRow: number; toCol: number } {
 	return {
 		fromRow: moveFromRow(move),
@@ -59,23 +126,7 @@ export function isEnPassantMove(m: Move):  boolean { return (moveFlags(m) & Move
 export function isCastleMove(m: Move):     boolean { return (moveFlags(m) & MoveFlag.Castle)     !== 0; }
 export function isDoublePushMove(m: Move): boolean { return (moveFlags(m) & MoveFlag.DoublePush) !== 0; }
 
-// --- Builders (mirrors old markAs* methods) ---
-export function makeCaptureMove(fromSq: number, toSq: number, captured: Piece): Move {
-	return makeMove(fromSq, toSq, MoveFlag.Capture, captured);
-}
-export function makeEnPassantMove(fromSq: number, toSq: number, capturedColor: Color): Move {
-	return makeMove(fromSq, toSq, MoveFlag.EnPassant | MoveFlag.Capture, makePiece(PieceName.Pawn, capturedColor));
-}
-export function makePromotionMove(fromSq: number, toSq: number, promotion: Piece, captured: Piece | null = null): Move {
-	const flags = MoveFlag.Promotion | (captured !== null ? MoveFlag.Capture : MoveFlag.None);
-	return makeMove(fromSq, toSq, flags, captured, promotion);
-}
-export function makeCastleMove(fromSq: number, toSq: number): Move {
-	return makeMove(fromSq, toSq, MoveFlag.Castle);
-}
-
-// --- Setters ---
-//                                                          | 15: NO_PIECE
+// --- Setters ---                                                       | 15: NO_PIECE
 export function setPromotionPiece(m: Move, promotion: Piece | 15): Move {
 	const clearedMove = m & ~(0xf << 21);
 	return clearedMove | (promotion << 21) | (MoveFlag.Promotion << 12);

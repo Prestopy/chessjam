@@ -1,7 +1,7 @@
 import {Chess} from "@/app/Chess";
 import {Engine} from "@/app/engines/Engine";
-import {swapColor} from "@/app/utils";
-import {Color, Move} from "@/app/bitboardHelpers";
+import {swapColor} from "@/app/utils/utils";
+import {Color, Move} from "@/app/utils/types";
 
 interface Evaluation {
 	score: number;

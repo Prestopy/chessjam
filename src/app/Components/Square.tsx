@@ -1,7 +1,8 @@
 import {useDrag, useDrop} from "react-dnd";
 import {useEffect} from "react";
-import {pieceSymbols} from "@/app/utils";
-import {Piece, pieceColor, pieceName, squareIndex} from "@/app/bitboardHelpers";
+import {Piece} from "@/app/utils/types";
+import {pieceSymbols} from "@/app/utils/constants";
+import {pieceColor, pieceName, squareIndex} from "@/app/utils/utils";
 
 export default function Square({ movePieceHere, row, col, squareDim, white, piece, setIsMouseDown, onDrag, highlight, disabled }: { movePieceHere: (row: number, col: number) => void, row: number, col: number, squareDim: number, white: boolean, piece: Piece | null, setIsMouseDown: (isDown: boolean) => void, onDrag: () => void, highlight: "none" | "possible" | "danger", disabled: boolean }) {
 	const WHITE = "#f0d9b5";

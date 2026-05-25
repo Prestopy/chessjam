@@ -1,5 +1,5 @@
 import {Chess} from "@/app/Chess";
-import {Color, Move} from "@/app/bitboardHelpers";
+import {Color, Move} from "@/app/utils/types";
 
 
 export class Engine {

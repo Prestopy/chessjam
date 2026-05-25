@@ -1,4 +1,4 @@
-import {GameDetails, GameState, MoveHistoryEntry, standardChessSetup, swapColor} from "@/app/utils";
+import {makePiece, pieceColor, pieceName, squareIndex, standardChessSetup, swapColor} from "@/app/utils/utils";
 import {
 	generatePseudoBishopMoves,
 	generatePseudoKingMoves,
@@ -6,22 +6,11 @@ import {
 	generatePseudoPawnMoves,
 	generatePseudoRookMoves,
 	GeneratorContext,
-} from "@/app/validators";
+} from "@/app/generators";
 import {
-	Board,
-	Color, colorOccupancy,
-	lsb,
-	makeEmptyBoard,
-	makePiece,
-	Move,
-	Piece,
-	pieceColor,
-	PieceName,
-	pieceName,
-	popcount,
-	squareIndex,
-	squareMask, u64,
-} from "@/app/bitboardHelpers";
+	colorOccupancy,
+	squareMask,
+} from "@/app/utils/bitboardHelpers";
 import {
 	disectMove,
 	isCaptureMove,
@@ -30,8 +19,10 @@ import {
 	isPromotionMove, moveCaptured,
 	movePromotion,
 	moveToCol,
-	moveToRow, moveToSq, NO_PIECE, setPromotionPiece
+	moveToRow, NO_PIECE, setPromotionPiece
 } from "@/app/Move";
+import {Board, Color, GameDetails, GameState, Move, MoveHistoryEntry, Piece, PieceName} from "@/app/utils/types";
+import {lsb, popcount, u64} from "@/app/utils/bitUtils";
 
 // --- Board read/write ---
 
@@ -534,7 +525,7 @@ export class Chess {
 		ranks: number,
 		files: number
 	): Board {
-		const newBoard = makeEmptyBoard();
+		const newBoard = new BigInt64Array(12) as Board;
 		for (let r = 0; r < ranks; r++) {
 			for (let f = 0; f < files; f++) {
 				const piece = standardChessSetup(r, f);

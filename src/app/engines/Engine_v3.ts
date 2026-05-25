@@ -8,7 +8,8 @@ import {
 	moveCaptured, moveFromCol,
 	moveFromRow
 } from "@/app/Move";
-import {Color, Move, pieceName, PieceName} from "@/app/bitboardHelpers";
+import {Color, Move, PieceName} from "@/app/utils/types";
+import {pieceName} from "@/app/utils/utils";
 
 interface Evaluation {
 	move: Move;

@@ -1,7 +1,7 @@
 import {Chess} from "@/app/Chess";
 import {Engine} from "@/app/engines/Engine";
 import {isCaptureMove} from "@/app/Move";
-import {Color, Move} from "@/app/bitboardHelpers";
+import {Color, Move} from "@/app/utils/types";
 
 export default class Engine_v2 extends Engine {
 	constructor()

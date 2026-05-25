@@ -1,7 +1,7 @@
 import {Chess} from "../Chess";
 import {Engine} from "../engines/Engine";
-import {allEngines, EngineVersion, GameState} from "@/app/utils";
-import {Board, Color, Move} from "@/app/bitboardHelpers";
+import {Board, Color, GameState, Move} from "@/app/utils/types";
+import {allEngines, EngineVersion} from "@/app/engines/engineDetails";
 
 let game: Chess;
 let gameOver = false;

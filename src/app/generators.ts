@@ -1,30 +1,21 @@
-import {MoveHistoryEntry, swapColor} from "@/app/utils";
+import {makePiece, swapColor} from "@/app/utils/utils";
 import {
 	allOccupancy, ANTI_DIAG,
-	blackOccupancy,
-	Board,
-	Color, DIAG, enemyOccupancy, FILE, FILE_B, FILE_C, FILE_D, FILE_F, FILE_G,
-	lsb,
-	makePiece,
-	Move,
-	MoveFlag, not64,
+	DIAG, enemyOccupancy, FILE, FILE_B, FILE_C, FILE_D, FILE_F, FILE_G,
 	NOT_A_FILE, NOT_AB_FILE, NOT_GH_FILE,
 	NOT_H_FILE,
-	PieceName, RANK,
-	RANK_4, RANK_5, reverseBits, rotateBits90Clockwise, rotateBits90Counter,
-	squareIndex, squareMask, u64,
-	whiteOccupancy
-} from "@/app/bitboardHelpers";
+	RANK,
+	RANK_4, RANK_5, squareMask
+} from "@/app/utils/bitboardHelpers";
 import {
 	makeMove,
 	isDoublePushMove,
 	moveToRow,
 	moveToSq,
-	setPromotionPiece,
-	disectMove,
-	isCaptureMove
+	setPromotionPiece, addMoves, addCaptureMoves, addMovesWithFlags
 } from "@/app/Move";
-import {getBoardSquare} from "@/app/Chess";
+import {Board, Color, Move, MoveFlag, MoveHistoryEntry, PieceName} from "@/app/utils/types";
+import {not64, reverseBits, u64} from "@/app/utils/bitUtils";
 
 export interface GeneratorContext {
 	board: Board;
@@ -35,62 +26,84 @@ export interface GeneratorContext {
 	}
 }
 
-/**
- * Helper function to add moves from a bitboard of target squares.
- * For each set bit in bb, adds a move from (fromRow, fromCol) to the corresponding square.
- * @param result
- * @param fromSq
- * @param bb
- */
-function addMoves(result: Move[], fromSq: number, bb: bigint) {
-	while(bb > 0n) {
-		const toSq = lsb(bb);
-		bb &= bb - 1n; // clear LSB
+function getPawnAttacks(sq: number, color: Color): bigint {
+	const pawn = squareMask(sq);
 
-		result.push(makeMove(fromSq, toSq))
+	if (color === Color.White) {
+		return u64(pawn << 7n) & NOT_H_FILE | u64(pawn << 9n) & NOT_A_FILE;
+	} else {
+		return u64(pawn >> 9n) & NOT_H_FILE | u64(pawn >> 7n) & NOT_A_FILE;
 	}
 }
+function getRookAttacks(sq: number, occupied: bigint): bigint {
+	const sqMask = squareMask(sq);
 
-/**
- * Helper function to add moves from a bitboard of target squares.
- * For each set bit in bb, adds a move from (fromRow, fromCol) to the corresponding square.
- * Additionally, sets the provided flags on each move (e.g. capture, promotion).
- * @param result
- * @param fromSq
- * @param bb
- * @param flags
- */
-function addMovesWithFlags(result: Move[], fromSq: number, bb: bigint, flags: MoveFlag) {
-	while(bb > 0n) {
-		const toSq = lsb(bb);
-		bb &= bb - 1n; // clear LSB
+	const fileMask = FILE[sq & 7];
+	const rankMask = RANK[sq >> 3];
 
-		result.push(makeMove(fromSq, toSq, flags))
-	}
+	// --- 1. VERTICAL MOVES ---
+	// CRITICAL: Strip the rook out of the occupancy line BEFORE subtracting
+	const oFile = (occupied & fileMask) ^ sqMask;
+
+	const fwdFile = u64(oFile - u64(2n * sqMask)) ^ oFile;
+
+	const revOFile = reverseBits(oFile);
+	const revSqFile = reverseBits(sqMask);
+	const bwdFile = reverseBits(u64(revOFile - u64(2n * revSqFile)) ^ revOFile);
+
+	const verticalMoves = u64(fwdFile | bwdFile) & fileMask;
+
+	// --- 2. HORIZONTAL MOVES ---
+	// CRITICAL: Strip the rook out of the occupancy line BEFORE subtracting
+	const oRank = (occupied & rankMask) ^ sqMask;
+
+	const fwdRank = u64(oRank - u64(2n * sqMask)) ^ oRank;
+
+	const revORank = reverseBits(oRank);
+	const revSqRank = reverseBits(sqMask);
+	const bwdRank = reverseBits(u64(revORank - u64(2n * revSqRank)) ^ revORank);
+
+	const horizontalMoves = u64(fwdRank | bwdRank) & rankMask;
+
+	// --- 3. COMBINE ---
+	// Mask out the rook's standing square from the total attack set
+	return u64(verticalMoves | horizontalMoves) & not64(sqMask);
 }
+function getBishopAttacks(sq: number, occupied: bigint): bigint {
+	const sqMask = squareMask(sq);
+	// Diagonal moves
+	const diagonal = DIAG[sq];
+	const antiDiagonal = ANTI_DIAG[sq];
 
-function addCaptureMoves(result: Move[], fromSq: number, bb: bigint, board: Board) {
-	while(bb > 0n) {
-		const toSq = lsb(bb);
-		bb &= bb - 1n; // clear LSB
+	const diagOccupancy = occupied & diagonal;
+	const antiDiagOccupancy = occupied & antiDiagonal;
 
-		const piece = getBoardSquare(board, toSq);
-		if (piece === null) throw new Error('Invalid capture move; no piece found on square indicated by bitboard');
-
-		result.push(makeMove(fromSq, toSq, MoveFlag.Capture, piece))
-	}
+	const diagMoves = (u64(diagOccupancy - 2n * sqMask) ^ reverseBits(reverseBits(u64(diagOccupancy)) - 2n * reverseBits(sqMask))) & diagonal;
+	const antiDiagMoves = (u64(antiDiagOccupancy - 2n * sqMask) ^ reverseBits(reverseBits(antiDiagOccupancy) - 2n * reverseBits(sqMask))) & antiDiagonal;
+	return u64(diagMoves | antiDiagMoves) & not64(sqMask);
 }
+function getKnightAttacks(sq: number): bigint {
+	const sqMask = squareMask(sq);
 
-function addCaptureMovesWithFlags(result: Move[], fromSq: number, bb: bigint, board: Board, flags: MoveFlag) {
-	while(bb > 0n) {
-		const toSq = lsb(bb);
-		bb &= bb - 1n; // clear LSB
-
-		const piece = getBoardSquare(board, toSq);
-		if (piece === null) throw new Error('Invalid capture move; no piece found on square indicated by bitboard');
-
-		result.push(makeMove(fromSq, toSq, flags | MoveFlag.Capture | piece << 16))
-	}
+	return u64(sqMask << 17n) & NOT_A_FILE
+		 | u64(sqMask << 15n) & NOT_H_FILE
+		 | u64(sqMask << 10n) & NOT_AB_FILE
+		 | u64(sqMask << 6n ) & NOT_GH_FILE
+		 | sqMask >> 17n      & NOT_H_FILE
+		 | sqMask >> 15n      & NOT_A_FILE
+		 | sqMask >> 10n      & NOT_GH_FILE
+		 | sqMask >> 6n       & NOT_AB_FILE;
+}
+function getKingAttacks(sq: number): bigint {
+	const sqMask = squareMask(sq);
+	return u64(sqMask << 9n) & NOT_A_FILE
+		 | u64(sqMask << 8n)
+		 | u64(sqMask << 7n) & NOT_H_FILE
+		 | u64(sqMask << 1n) & NOT_H_FILE
+		 | sqMask >> 1n      & NOT_A_FILE
+		 | sqMask >> 7n      & NOT_A_FILE
+		 | sqMask >> 8n
+		 | sqMask >> 9n      & NOT_H_FILE;
 }
 
 export function generatePseudoPawnMoves(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {
@@ -104,21 +117,19 @@ export function generatePseudoPawnMoves(fromSq: number, color: Color, ctx: Gener
 	if (color === Color.White) {
 		const single = u64(pawn << 8n) & not64(occupied);
 		const double = u64(single << 8n) & not64(occupied) & RANK_4;
-		const captureLeft = u64(pawn << 7n) & enemy & NOT_H_FILE;
-		const captureRight = u64(pawn << 9n) & enemy & NOT_A_FILE;
+		const attacks = getPawnAttacks(fromSq, color) & enemy;
 
 		addMoves(moves, fromSq, single);
 		addMovesWithFlags(moves, fromSq, double, MoveFlag.DoublePush);
-		addCaptureMoves(moves, fromSq, captureLeft | captureRight, ctx.board);
+		addCaptureMoves(moves, fromSq, attacks, ctx.board);
 	} else {
 		const single = (pawn >> 8n) & not64(occupied);
 		const double = (single >> 8n) & not64(occupied) & RANK_5;
-		const captureLeft = (pawn >> 9n) & enemy & NOT_H_FILE;
-		const captureRight = (pawn >> 7n) & enemy & NOT_A_FILE;
+		const attacks = getPawnAttacks(fromSq, color) & enemy;
 
 		addMoves(moves, fromSq, single);
 		addMovesWithFlags(moves, fromSq, double, MoveFlag.DoublePush);
-		addCaptureMoves(moves, fromSq, captureLeft | captureRight, ctx.board);
+		addCaptureMoves(moves, fromSq, attacks, ctx.board);
 	}
 
 	// En passant
@@ -182,64 +193,21 @@ export function generatePseudoPawnMoves(fromSq: number, color: Color, ctx: Gener
 export function generatePseudoRookMoves(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {
 	const moves: Move[] = [];
 
-	const sqMask = squareMask(fromSq);
 	const occupied = allOccupancy(ctx.board);
 	const enemy = enemyOccupancy(ctx.board, color);
-
-	const fileMask = FILE[fromSq & 7];
-	const rankMask = RANK[fromSq >> 3];
-
-	// --- 1. VERTICAL MOVES ---
-	// CRITICAL: Strip the rook out of the occupancy line BEFORE subtracting
-	const oFile = (occupied & fileMask) ^ sqMask;
-
-	const fwdFile = u64(oFile - u64(2n * sqMask)) ^ oFile;
-
-	const revOFile = reverseBits(oFile);
-	const revSqFile = reverseBits(sqMask);
-	const bwdFile = reverseBits(u64(revOFile - u64(2n * revSqFile)) ^ revOFile);
-
-	const verticalMoves = u64(fwdFile | bwdFile) & fileMask;
-
-	// --- 2. HORIZONTAL MOVES ---
-	// CRITICAL: Strip the rook out of the occupancy line BEFORE subtracting
-	const oRank = (occupied & rankMask) ^ sqMask;
-
-	const fwdRank = u64(oRank - u64(2n * sqMask)) ^ oRank;
-
-	const revORank = reverseBits(oRank);
-	const revSqRank = reverseBits(sqMask);
-	const bwdRank = reverseBits(u64(revORank - u64(2n * revSqRank)) ^ revORank);
-
-	const horizontalMoves = u64(fwdRank | bwdRank) & rankMask;
-
-	// --- 3. COMBINE ---
-	// Mask out the rook's standing square from the total attack set
-	const attacks = u64(verticalMoves | horizontalMoves) & not64(sqMask);
+	const attacks = getRookAttacks(fromSq, occupied);
 
 	addMoves(moves, fromSq, attacks & not64(occupied));
 	addCaptureMoves(moves, fromSq, attacks & enemy, ctx.board);
 
 	return moves;
 }
-
 export function generatePseudoBishopMoves(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {
 	const moves: Move[] = [];
 
-	const sqMask = squareMask(fromSq);
 	const occupied = allOccupancy(ctx.board);
 	const enemy = enemyOccupancy(ctx.board, color);
-
-	// Diagonal moves
-	const diagonal = DIAG[fromSq];
-	const antiDiagonal = ANTI_DIAG[fromSq];
-
-	const diagOccupancy = occupied & diagonal;
-	const antiDiagOccupancy = occupied & antiDiagonal;
-
-	const diagMoves = (u64(diagOccupancy - 2n * sqMask) ^ reverseBits(reverseBits(u64(diagOccupancy)) - 2n * reverseBits(sqMask))) & diagonal;
-	const antiDiagMoves = (u64(antiDiagOccupancy - 2n * sqMask) ^ reverseBits(reverseBits(antiDiagOccupancy) - 2n * reverseBits(sqMask))) & antiDiagonal;
-	const attacks = u64(diagMoves | antiDiagMoves) & not64(sqMask);
+	const attacks = getBishopAttacks(fromSq, occupied);
 
 	addMoves(moves, fromSq, attacks & not64(occupied));
 	addCaptureMoves(moves, fromSq, attacks & enemy, ctx.board);
@@ -249,20 +217,9 @@ export function generatePseudoBishopMoves(fromSq: number, color: Color, ctx: Gen
 export function generatePseudoKnightMoves(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {
 	const moves: Move[] = [];
 
-	const sqMask = squareMask(fromSq);
 	const occupied = allOccupancy(ctx.board);
 	const enemy = enemyOccupancy(ctx.board, color);
-
-	const attacks = (
-		  u64(sqMask << 17n) & NOT_A_FILE
-		| u64(sqMask << 15n) & NOT_H_FILE
-		| u64(sqMask << 10n) & NOT_AB_FILE
-		| u64(sqMask << 6n ) & NOT_GH_FILE
-		| sqMask >> 17n & NOT_H_FILE
-		| sqMask >> 15n & NOT_A_FILE
-		| sqMask >> 10n & NOT_GH_FILE
-		| sqMask >> 6n  & NOT_AB_FILE
-	);
+	const attacks = getKnightAttacks(fromSq);
 
 	addMoves(moves, fromSq, attacks & not64(occupied));
 	addCaptureMoves(moves, fromSq, attacks & enemy, ctx.board);
@@ -272,20 +229,9 @@ export function generatePseudoKnightMoves(fromSq: number, color: Color, ctx: Gen
 export function generatePseudoKingMoves(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {
 	const moves: Move[] = [];
 
-	const sqMask = squareMask(fromSq);
 	const occupied = allOccupancy(ctx.board);
 	const enemy = enemyOccupancy(ctx.board, color);
-
-	const attacks = (
-		  u64(sqMask << 9n) & NOT_A_FILE
-		| u64(sqMask << 8n)
-		| u64(sqMask << 7n) & NOT_H_FILE
-		| u64(sqMask << 1n) & NOT_H_FILE
-		| sqMask >> 1n & NOT_A_FILE
-		| sqMask >> 7n & NOT_A_FILE
-		| sqMask >> 8n
-		| sqMask >> 9n & NOT_H_FILE
-	)
+	const attacks = getKingAttacks(fromSq);
 
 	addMoves(moves, fromSq, attacks & not64(occupied));
 	addCaptureMoves(moves, fromSq, attacks & enemy, ctx.board);

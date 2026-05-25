@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Color, makePiece, PieceName } from "@/app/bitboardHelpers";
-import { GameStage, swapColor } from "@/app/utils";
+import {makePiece, swapColor} from "@/app/utils/utils";
 import { PST as StaticPST } from "@/app/engines/pst";
+import {Color, GameStage, PieceName} from "@/app/utils/types";
 
 // Map our 0 and 1 state variables safely back to the GameStage enum variants
 const STAGE_MAP: Record<number, GameStage> = {

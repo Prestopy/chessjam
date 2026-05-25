@@ -2,8 +2,10 @@ import Square from "@/app/Components/Square";
 import {DndProvider} from 'react-dnd'
 import {HTML5Backend} from 'react-dnd-html5-backend'
 import React, {useEffect, useState} from "react";
-import {Board, lsb, Move, Piece, squareIndex} from "@/app/bitboardHelpers";
 import {makeMove} from "@/app/Move";
+import {Board, Move, Piece} from "@/app/utils/types";
+import {lsb} from "@/app/utils/bitUtils";
+import {squareIndex} from "@/app/utils/utils";
 
 export default function ChessboardDisplay({ squareDim, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (r: number, c: number) => {row: number, col: number}[], disable?: boolean }) {
 	const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);

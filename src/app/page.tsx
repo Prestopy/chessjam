@@ -3,16 +3,10 @@ import {useEffect, useRef, useState} from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import {Chess} from "@/app/Chess";
 import {
-	allEngines,
-	EngineVersion,
-	GameDetails,
-	GameState,
-	getEngineDetail,
-	moveToNotation,
-	pieceSymbols
-} from "@/app/utils";
+	makePiece,
+	moveToNotation, pieceColor, pieceName
+} from "@/app/utils/utils";
 import {Engine} from "@/app/engines/Engine";
-import {Color, makePiece, Move, Piece, pieceColor, PieceName, pieceName} from "@/app/bitboardHelpers";
 import {
 	disectMove,
 	isCaptureMove,
@@ -23,6 +17,9 @@ import {
 	moveToRow,
 	setPromotionPiece
 } from "@/app/Move";
+import {Color, GameDetails, GameState, Move, Piece, PieceName} from "@/app/utils/types";
+import {allEngines, EngineVersion, getEngineDetail} from "@/app/engines/engineDetails";
+import {pieceSymbols} from "@/app/utils/constants";
 
 export default function Home() {
 	const chessGame = useRef(new Chess(8, 8));

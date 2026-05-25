@@ -2,11 +2,11 @@
 import {useEffect, useRef, useState} from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import {Chess} from "@/app/Chess";
-import {allEngines, EngineVersion, GameState} from "@/app/utils";
 import ProgressBar from "@/app/Components/ProgressBar";
 
 import {useVirtualizer} from '@tanstack/react-virtual';
-import {Board, Color, Move} from "@/app/bitboardHelpers";
+import {Board, Color, GameState, Move} from "@/app/utils/types";
+import {allEngines, EngineVersion} from "@/app/engines/engineDetails";
 
 interface GameData {
 	gameState: GameState;

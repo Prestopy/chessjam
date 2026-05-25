@@ -1,8 +1,7 @@
 import {Chess} from "@/app/Chess";
-import {GameStage} from "@/app/utils";
-import {Color, Piece} from "@/app/bitboardHelpers";
 import Engine_v5 from "@/app/engines/Engine_v5";
 import {PST} from "@/app/engines/pst";
+import {Color, GameStage, Piece} from "@/app/utils/types";
 
 // Utility Bitscan helper for your loops
 function getSquareIndices(bitboard: bigint): number[] {
