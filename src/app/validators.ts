@@ -1,4 +1,4 @@
-import {MoveHistoryEntry} from "@/app/utils";
+import {MoveHistoryEntry, swapColor} from "@/app/utils";
 import {
 	allOccupancy, ANTI_DIAG,
 	blackOccupancy,
@@ -15,7 +15,15 @@ import {
 	squareIndex, squareMask, u64,
 	whiteOccupancy
 } from "@/app/bitboardHelpers";
-import {makeMove, isDoublePushMove, moveToRow, moveToSq, setPromotionPiece} from "@/app/Move";
+import {
+	makeMove,
+	isDoublePushMove,
+	moveToRow,
+	moveToSq,
+	setPromotionPiece,
+	disectMove,
+	isCaptureMove
+} from "@/app/Move";
 import {getBoardSquare} from "@/app/Chess";
 
 export interface GeneratorContext {
@@ -133,7 +141,6 @@ export function generatePseudoPawnMoves(fromSq: number, color: Color, ctx: Gener
 				if (color === Color.White) {
 					// The square directly behind the enemy pawn (where our pawn lands)
 					const epTargetSq = enemyPawnSq + 8;
-					const epTargetMask = squareMask(epTargetSq);
 
 					// Ensure the move doesn't wrap files (redundancy check for absolute safety)
 					const isLegalFile = (myCol === 0 && (epTargetSq & 7) === 1) ||
@@ -141,19 +148,18 @@ export function generatePseudoPawnMoves(fromSq: number, color: Color, ctx: Gener
 						(myCol > 0 && myCol < 7);
 
 					if (isLegalFile) {
-						addCaptureMovesWithFlags(moves, fromSq, epTargetMask, ctx.board, MoveFlag.EnPassant);
+						moves.push(makeMove(fromSq, epTargetSq, MoveFlag.EnPassant, makePiece(PieceName.Pawn, swapColor(color))));
 					}
 				} else {
 					// Black captures moving down the board
 					const epTargetSq = enemyPawnSq - 8;
-					const epTargetMask = squareMask(epTargetSq);
 
 					const isLegalFile = (myCol === 0 && (epTargetSq & 7) === 1) ||
 						(myCol === 7 && (epTargetSq & 7) === 6) ||
 						(myCol > 0 && myCol < 7);
 
 					if (isLegalFile) {
-						addCaptureMovesWithFlags(moves, fromSq, epTargetMask, ctx.board, MoveFlag.EnPassant);
+						moves.push(makeMove(fromSq, epTargetSq, MoveFlag.EnPassant, makePiece(PieceName.Pawn, swapColor(color))));
 					}
 				}
 			}

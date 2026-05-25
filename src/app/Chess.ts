@@ -397,7 +397,6 @@ export class Chess {
 		const promotionMove = matched.find(
 			m => movePromotion(move) === movePromotion(m)
 		);
-		console.log(matched.map(m => `${m} ${moveToSq(m)} ${movePromotion(m)}`), `${move} ${moveToSq(move)} ${movePromotion(move)}`, promotionMove)
 		if (!promotionMove) throw new Error("Multiple moves found but none match the promotion piece.");
 		return { valid: true, enrichedMove: promotionMove };
 	}
