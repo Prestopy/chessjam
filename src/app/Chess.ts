@@ -318,9 +318,6 @@ export class Chess {
 		return { ok: true };
 	}
 
-	// TODO: does this restore castling rights?
-	// FIXME: There are bugs where some positions can't be unmoved properly
-	// probably special moves. Check that move generators apply all necessary flags
 	unmakeMove(move: Move): void {
 		const { fromRow, fromCol, toRow, toCol } = disectMove(move);
 
@@ -358,10 +355,12 @@ export class Chess {
 				// King-side
 				this.setSquare(fromRow, fromCol + 1, null);
 				this.setSquare(fromRow, this.numFiles - 1, makePiece(PieceName.Rook, pieceColor(movingPiece)));
+				this.kingSideCastleRights = { ...this.kingSideCastleRights, [pieceColor(movingPiece)]: true };
 			} else if (toCol === fromCol - 2) {
 				// Queen-side
 				this.setSquare(fromRow, fromCol - 1, null);
 				this.setSquare(fromRow, 0, makePiece(PieceName.Rook, pieceColor(movingPiece)));
+				this.queenSideCastleRights = { ...this.queenSideCastleRights, [pieceColor(movingPiece)]: true };
 			}
 		}
 
