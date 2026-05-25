@@ -62,8 +62,15 @@ export default function TesterV2() {
 			const engine1IsWhite = i < games / 2;
 
 			worker.onmessage = (e) => {
-				const {board: updatedBoard, winner, gameState, movesMade, averageThinkTime} = e.data;
+				const resultBuffer = new BigInt64Array(e.data.buffer);
+				const updatedBoard: Board = new BigInt64Array(12) as Board;
+				for (let i = 0; i < 12; i++) updatedBoard[i] = resultBuffer[i];
 
+				const gameState = Number(resultBuffer[12]) as GameState;
+				const winnerVal = Number(resultBuffer[13]);
+				const winner = winnerVal === 2 ? null : (winnerVal as Color);
+				const movesMade = Number(resultBuffer[14]);
+				const averageThinkTime = Number(resultBuffer[15]);
 
 				// Update board
 				setChessPositions((prev) => {
@@ -83,7 +90,7 @@ export default function TesterV2() {
 					// check if it's the last one to complete
 					completed.current++;
 
-					if (winner) {
+					if (winner !== null) {
 						if (engine1IsWhite && winner === Color.White || !engine1IsWhite && winner === Color.Black) setEngine1Wins((prev) => prev + 1);
 						else setEngine2Wins((prev) => prev + 1);
 					}

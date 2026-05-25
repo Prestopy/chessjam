@@ -53,15 +53,36 @@ self.onmessage = function (e) {
 		// Post new board
 		const timeThinking = endTime - startTime;
 		totalTimeThinking += timeThinking;
-		self.postMessage({board: game.getBoard(), winner: null, gameState: GameState.Running, movesMade: game.getHistory().length, averageThinkTime: totalTimeThinking / game.getHistory().length});
+
+
+		const buffer = buildBuffer().buffer;
+		// @ts-expect-error it works :shrug:
+		self.postMessage({ buffer }, [buffer]);
 
 		game.nextTurn();
 	}, thinkTime);
 };
 
+function buildBuffer() {
+	const buffer = new BigInt64Array(16); // Placeholder for transferable data if needed
+	const board = game.getBoard();
+	for (let i=0; i<12; i++) buffer[i] = board[i];
+
+	const gameDetails = game.getGameDetails();
+
+	buffer[12] = BigInt(gameDetails.state);
+	buffer[13] = gameDetails.winner ? BigInt(gameDetails.winner) : 2n; // 2n: no color
+	buffer[14] = BigInt(game.getHistory().length);
+	buffer[15] = BigInt(Math.round(totalTimeThinking / game.getHistory().length));
+
+	return buffer;
+}
+
 function callGameOver() {
 	gameOver = true;
-	const gameDetails = game.getGameDetails();
-	self.postMessage({board: game.getBoard(), winner: gameDetails.winner, gameState: gameDetails.state, movesMade: game.getHistory().length, averageThinkTime: totalTimeThinking / game.getHistory().length});
+
+	const buffer = buildBuffer().buffer;
+	// @ts-expect-error it works :shrug:
+	self.postMessage({ buffer }, [buffer]);
 	return;
 }

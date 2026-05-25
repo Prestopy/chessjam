@@ -33,10 +33,10 @@ export const enum Piece {
 export type Board = BigInt64Array & { length: 12 };
 
 export enum GameState {
-	Running = "Running",
-	Checkmate = "Checkmate",
-	Stalemate = "Stalemate",
-	Draw = "Draw",
+	Running,
+	Checkmate,
+	Stalemate,
+	Draw,
 }
 
 export interface GameDetails {
