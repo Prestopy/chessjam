@@ -412,7 +412,7 @@ export class Chess {
 	}
 
 	// FIXME: USE ENUMS
-	isMate(color: Color): Exclude<GameState, "draw"> {
+	isMate(color: Color): Exclude<GameState, GameState.Draw> {
 		if (!this.hasPiece(makePiece(PieceName.King, color))) return GameState.Checkmate;
 
 		// console.log("Checking for mate by generating all possible moves for color", color);

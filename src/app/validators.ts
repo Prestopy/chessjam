@@ -99,8 +99,6 @@ export function generatePseudoPawnMoves(fromSq: number, color: Color, ctx: Gener
 		const captureLeft = u64(pawn << 7n) & enemy & NOT_H_FILE;
 		const captureRight = u64(pawn << 9n) & enemy & NOT_A_FILE;
 
-		// FIXME: ENCODE CAPTURED PIECE DATA
-
 		addMoves(moves, fromSq, single);
 		addMovesWithFlags(moves, fromSq, double, MoveFlag.DoublePush);
 		addCaptureMoves(moves, fromSq, captureLeft | captureRight, ctx.board);
