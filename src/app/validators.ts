@@ -121,7 +121,6 @@ export function generatePseudoPawnMoves(fromSq: number, color: Color, ctx: Gener
 		addCaptureMoves(moves, fromSq, captureLeft | captureRight, ctx.board);
 	}
 
-	// FIXME
 	// En passant
 	if (ctx.moveHistory.length > 0) {
 		const enemyPrevMove = ctx.moveHistory.at(-1)!;

@@ -68,7 +68,6 @@ export default function Home() {
 		castleSfx.current = new Audio("/sfx/castle.mp3");
 	}, []);
 
-	// FIXME: This logic shouldn't be in page.tsx :sob: :sob:
 	const handleMove = (move: Move) => {
 		const pieceMoved = chessGame.current.getSquare(moveFromRow(move), moveFromCol(move));
 		if (pieceMoved === null) return;
