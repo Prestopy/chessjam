@@ -1,12 +1,5 @@
 import {makePiece, pieceColor, pieceName, squareIndex, standardChessSetup, swapColor} from "@/app/utils/utils";
-import {
-	generatePseudoBishopMoves,
-	generatePseudoKingMoves,
-	generatePseudoKnightMoves,
-	generatePseudoPawnMoves,
-	generatePseudoRookMoves,
-	GeneratorContext,
-} from "@/app/generators";
+import {Generator, GeneratorContext} from "@/app/generators/generators";
 import {
 	colorOccupancy,
 	squareMask,
@@ -65,6 +58,8 @@ export class Chess {
 	private gameDetails: GameDetails;
 	private materialScore: number = 0; // positive = white advantage
 
+	private generator: Generator;
+
 	private phaseValue: number = 24; // TODO: Should not be fixed; calculate at the start of the game
 
 	private static readonly PIECE_VALUE: Record<PieceName, number> = {
@@ -89,6 +84,8 @@ export class Chess {
 		this.currentTurn = Color.White;
 		this.gameDetails = { state: GameState.Running, winner: null };
 		this.materialScore = this.computeMaterialScore();
+
+		this.generator = new Generator()
 	}
 
 	// GETTERS #########################################################################################################
@@ -392,31 +389,7 @@ export class Chess {
 		};
 
 		const color = pieceColor(movingPiece);
-		let pseudoLegalMoves: Move[] = [];
-
-		switch (pieceName(movingPiece)) {
-			case PieceName.Pawn:
-				pseudoLegalMoves = generatePseudoPawnMoves(fromSq, color, generatorCtx);
-				break;
-			case PieceName.Rook:
-				pseudoLegalMoves = generatePseudoRookMoves(fromSq, color, generatorCtx);
-				break;
-			case PieceName.Bishop:
-				pseudoLegalMoves = generatePseudoBishopMoves(fromSq, color, generatorCtx);
-				break;
-			case PieceName.Knight:
-				pseudoLegalMoves = generatePseudoKnightMoves(fromSq, color, generatorCtx);
-				break;
-			case PieceName.King:
-				pseudoLegalMoves = generatePseudoKingMoves(fromSq, color, generatorCtx);
-				break;
-			case PieceName.Queen:
-				pseudoLegalMoves = [
-					...generatePseudoRookMoves(fromSq, color, generatorCtx),
-					...generatePseudoBishopMoves(fromSq, color, generatorCtx),
-				];
-				break;
-		}
+		const pseudoLegalMoves = this.generator.generateMovesForPiece(movingPiece, fromSq, generatorCtx);
 
 		if (!legal) return pseudoLegalMoves;
 
