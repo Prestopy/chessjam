@@ -1,12 +1,13 @@
-import {Chess} from "@/app/Chess";
-import {Color, Move} from "@/app/utils/types";
-
+import { Chess } from "@/app/Chess";
+import { Color, Move, EngineDiagnostics } from "@/app/utils/types";
 
 export class Engine {
 	chessGame: Chess | null = null;
 	color: Color = Color.White;
 
-	constructor(game: Chess | undefined, color: Color | undefined)
+	// Callback to push live data to the UI
+	onDiagnosticsUpdate?: (data: EngineDiagnostics) => void;
+
 	constructor(game?: Chess, color?: Color) {
 		if (game) this.chessGame = game;
 		if (color) this.color = color;
@@ -20,6 +21,18 @@ export class Engine {
 	connectTo(game: Chess): Engine {
 		this.chessGame = game;
 		return this;
+	}
+
+	// Assign diagnostic listener from UI
+	setDiagnosticsListener(callback: (data: EngineDiagnostics) => void): Engine {
+		this.onDiagnosticsUpdate = callback;
+		return this;
+	}
+
+	publishDiagnostics(data: EngineDiagnostics) {
+		if (this.onDiagnosticsUpdate) {
+			this.onDiagnosticsUpdate(data);
+		}
 	}
 
 	pickMove(): Move | null {

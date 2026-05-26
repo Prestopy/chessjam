@@ -67,3 +67,12 @@ export interface MoveHistoryEntry {
 	move: Move;
 	piece: Piece
 }
+
+// ##### Engine #####
+export interface EngineDiagnostics {
+	nodesVisited: number;
+	depthReached: number;
+	currentEval: number;
+	timeElapsedMs: number;
+	bestMove?: string;
+}
