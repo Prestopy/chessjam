@@ -1,3 +1,6 @@
+import {Board, Piece} from "@/app/utils/types";
+import {squareMask} from "@/app/utils/bitboardHelpers";
+
 /**
  * Utility function for bit manipulation on bigints treated as unsigned 64-bit integers.
  * @param n
@@ -61,4 +64,35 @@ export function reverseBits(n: bigint): bigint {
 		temp >>= 1n;
 	}
 	return u64(result);
+}
+
+/**
+ * Sets a square to a piece (clearing whatever was there first).
+ */
+export function setSquare(board: Board, sq: number, piece: Piece | null): void {
+	clearSquare(board, sq);
+	if (piece !== null) {
+		board[piece] |= squareMask(sq);
+	}
+}
+
+/**
+ * Clears all pieces from a square.
+ */
+function clearSquare(board: Board, sq: number): void {
+	const mask = squareMask(sq);
+	for (let p = 0; p < 12; p++) {
+		board[p] = u64(board[p] & u64(~mask));
+	}
+}
+
+/**
+ * Returns the Piece enum value on a given square, or null if empty.
+ */
+export function getBoardSquare(board: Board, sq: number): Piece | null {
+	const mask = squareMask(sq);
+	for (let p = 0; p < 12; p++) {
+		if (board[p] & mask) return p as Piece;
+	}
+	return null;
 }

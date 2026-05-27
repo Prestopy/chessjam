@@ -1,54 +1,32 @@
 import {makePiece, pieceColor, pieceName, squareIndex, standardChessSetup, swapColor} from "@/app/utils/utils";
 import {Generator, GeneratorContext} from "@/app/generators/generators";
-import {
-	colorOccupancy,
-	squareMask,
-} from "@/app/utils/bitboardHelpers";
+import {colorOccupancy, squareMask} from "@/app/utils/bitboardHelpers";
 import {
 	disectMove,
 	isCaptureMove,
 	isCastleMove,
 	isEnPassantMove,
-	isPromotionMove, moveCaptured,
+	isPromotionMove,
+	moveCaptured,
 	movePromotion,
 	moveToCol,
-	moveToRow, NO_PIECE, setPromotionPiece
+	moveToRow,
+	NO_PIECE,
+	setPromotionPiece
 } from "@/app/Move";
-import {Board, Color, GameDetails, GameState, Move, MoveHistoryEntry, Piece, PieceName} from "@/app/utils/types";
-import {lsb, popcount, u64} from "@/app/utils/bitUtils";
+import {
+	Board,
+	Color,
+	GameDetails,
+	GameState,
+	Move,
+	MoveHistoryEntry,
+	Piece,
+	PieceName,
+} from "@/app/utils/types";
+import {getBoardSquare, lsb, popcount, setSquare} from "@/app/utils/bitUtils";
 
 // --- Board read/write ---
-
-/**
- * Returns the Piece enum value on a given square, or null if empty.
- */
-export function getBoardSquare(board: Board, sq: number): Piece | null {
-	const mask = squareMask(sq);
-	for (let p = 0; p < 12; p++) {
-		if (board[p] & mask) return p as Piece;
-	}
-	return null;
-}
-
-/**
- * Clears all pieces from a square.
- */
-function clearSquare(board: Board, sq: number): void {
-	const mask = squareMask(sq);
-	for (let p = 0; p < 12; p++) {
-		board[p] = u64(board[p] & u64(~mask));
-	}
-}
-
-/**
- * Sets a square to a piece (clearing whatever was there first).
- */
-function setSquare(board: Board, sq: number, piece: Piece | null): void {
-	clearSquare(board, sq);
-	if (piece !== null) {
-		board[piece] |= squareMask(sq);
-	}
-}
 
 export class Chess {
 	private board: Board;
