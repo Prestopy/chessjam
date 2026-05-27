@@ -51,6 +51,15 @@ export enum GameStage {
 }
 
 
+// ##### Visuals #####
+export interface SquareHighlight {
+	row: number;
+	col: number;
+	color: string;
+	type: "highlight" | "dot";
+}
+
+
 // ##### Move types #####
 export type Move = number;
 

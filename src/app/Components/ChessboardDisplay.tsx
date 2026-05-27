@@ -3,15 +3,15 @@ import {DndProvider} from 'react-dnd'
 import {HTML5Backend} from 'react-dnd-html5-backend'
 import React, {useEffect, useState} from "react";
 import {makeMove} from "@/app/Move";
-import {Board, Move, Piece} from "@/app/utils/types";
+import {Board, Move, Piece, SquareHighlight} from "@/app/utils/types";
 import {lsb} from "@/app/utils/bitUtils";
 import {squareIndex} from "@/app/utils/utils";
 
-export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, flip: boolean, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (r: number, c: number) => {row: number, col: number, color: string}[], disable?: boolean }) {
+export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, flip: boolean, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (sq?: number) => SquareHighlight[], disable?: boolean }) {
 	const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
 	const [isMouseDown, setIsMouseDown] = useState(false);
 
-	const [highlights, setHighlights] = useState<{ row: number; col: number; color: string }[]>([]);
+	const [highlights, setHighlights] = useState<SquareHighlight[]>([]);
 
 	const [structuredBoard, setStructuredBoard] = useState<(Piece | null)[][]>([]);
 
@@ -33,6 +33,7 @@ export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove,
 
 	useEffect(() => {
 		setStructuredBoard(boardToGrid(chessboard, 8, 8));
+		setHighlights(getHighlights())
 	}, [chessboard]);
 
 	return (
@@ -74,10 +75,10 @@ export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove,
 												onDrag={() => {
 													if (disable) return;
 
-													const newHighlights = getHighlights(rowIndex, colIndex);
+													const newHighlights = getHighlights(squareIndex(rowIndex, colIndex));
 													setHighlights(newHighlights);
 												}}
-												highlight={disable ? "" : highlights.find(h => h.row === rowIndex && h.col === colIndex)?.color ?? ""}
+												highlight={highlights.find(h => h.row === rowIndex && h.col === colIndex) ?? null}
 												disabled={disable ?? false}
 											/>
 										</div>

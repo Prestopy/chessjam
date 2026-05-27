@@ -5,7 +5,7 @@ import {Chess} from "@/app/Chess";
 import {pieceColor} from "@/app/utils/utils";
 import {Engine} from "@/app/engines/Engine";
 import {isCaptureMove, isCastleMove, moveFromCol, moveFromRow, moveToCol, moveToRow} from "@/app/Move";
-import {Color, EngineDiagnostics, GameDetails, GameState, Move} from "@/app/utils/types";
+import {Color, EngineDiagnostics, GameDetails, GameState, Move, SquareHighlight} from "@/app/utils/types";
 import {allEngines, EngineVersion, getEngineDetail} from "@/app/engines/engineDetails";
 
 export default function Home() {
@@ -71,19 +71,38 @@ export default function Home() {
 		}
 	};
 
-	const getHighlightsForSquare = (r: number, c: number) => {
-		const NORMAL = "rgba(255,244,0,0.25)";
+	const getHighlightsForSquare = (sq?: number): SquareHighlight[] => {
+		const WHITE = "rgba(191,191,191,0.75)";
+		const LAST_MOVE = "rgba(255,244,0,0.25)";
 		const CAPTURE = "rgba(181,0,0,0.75)";
 
-		const game = chessGame.current;
-		const piece = game.getSquare(r, c);
-		if (piece === null || game.getTurn() !== pieceColor(piece)) return [];
+		const highlights: SquareHighlight[] = [];
 
-		return game.generateMoves(r, c, true).map(m => ({
-			row: moveToRow(m),
-			col: moveToCol(m),
-			color: isCaptureMove(m) ? CAPTURE : NORMAL
-		}));
+		// Move for sq if provided
+		if (sq) {
+			const game = chessGame.current;
+			const piece = game.getSquare(sq >> 3, sq & 7);
+			if (piece === null || game.getTurn() !== pieceColor(piece)) return [];
+
+			highlights.push(...game.generateMoves(sq >> 3, sq & 7, true).map(m => ({
+				row: moveToRow(m),
+				col: moveToCol(m),
+				color: isCaptureMove(m) ? CAPTURE : WHITE,
+				type: isCaptureMove(m) ? "highlight" as const : "dot" as const,
+			})));
+		}
+
+		// Last move
+		const moveHistory = chessGame.current.getHistory();
+		if (moveHistory.length > 0) {
+			const lastMove = moveHistory[moveHistory.length - 1].move;
+			highlights.push(
+				{ row: moveFromRow(lastMove), col: moveFromCol(lastMove), color: LAST_MOVE, type: "highlight" },
+				{ row: moveToRow(lastMove), col: moveToCol(lastMove), color: LAST_MOVE, type: "highlight" },
+			);
+		}
+
+		return highlights;
 	};
 
 	const playMoveSound = (move: Move) => {
