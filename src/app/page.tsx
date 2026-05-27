@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import {useEffect, useRef, useState} from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
-import { Chess } from "@/app/Chess";
-import { pieceColor } from "@/app/utils/utils";
-import { Engine } from "@/app/engines/Engine";
-import { moveFromCol, moveFromRow, moveToCol, moveToRow, isCaptureMove, isCastleMove } from "@/app/Move";
-import { Color, GameDetails, GameState, Move, EngineDiagnostics } from "@/app/utils/types";
-import { allEngines, EngineVersion, getEngineDetail } from "@/app/engines/engineDetails";
+import {Chess} from "@/app/Chess";
+import {pieceColor} from "@/app/utils/utils";
+import {Engine} from "@/app/engines/Engine";
+import {isCaptureMove, isCastleMove, moveFromCol, moveFromRow, moveToCol, moveToRow} from "@/app/Move";
+import {Color, EngineDiagnostics, GameDetails, GameState, Move} from "@/app/utils/types";
+import {allEngines, EngineVersion, getEngineDetail} from "@/app/engines/engineDetails";
 
 export default function Home() {
 	const chessGame = useRef(new Chess(8, 8));
@@ -72,10 +72,18 @@ export default function Home() {
 	};
 
 	const getHighlightsForSquare = (r: number, c: number) => {
+		const NORMAL = "rgba(255,244,0,0.25)";
+		const CAPTURE = "rgba(181,0,0,0.75)";
+
 		const game = chessGame.current;
 		const piece = game.getSquare(r, c);
 		if (piece === null || game.getTurn() !== pieceColor(piece)) return [];
-		return game.generateMoves(r, c, true).map(m => ({ row: moveToRow(m), col: moveToCol(m) }));
+
+		return game.generateMoves(r, c, true).map(m => ({
+			row: moveToRow(m),
+			col: moveToCol(m),
+			color: isCaptureMove(m) ? CAPTURE : NORMAL
+		}));
 	};
 
 	const playMoveSound = (move: Move) => {
@@ -141,6 +149,7 @@ export default function Home() {
 
 					<ChessboardDisplay
 						squareDim={75}
+						flip
 						chessboard={chessPosition}
 						onMove={handleMove}
 						getHighlights={getHighlightsForSquare}

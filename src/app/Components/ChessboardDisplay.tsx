@@ -7,11 +7,11 @@ import {Board, Move, Piece} from "@/app/utils/types";
 import {lsb} from "@/app/utils/bitUtils";
 import {squareIndex} from "@/app/utils/utils";
 
-export default function ChessboardDisplay({ squareDim, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (r: number, c: number) => {row: number, col: number}[], disable?: boolean }) {
+export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, flip: boolean, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (r: number, c: number) => {row: number, col: number, color: string}[], disable?: boolean }) {
 	const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
 	const [isMouseDown, setIsMouseDown] = useState(false);
 
-	const [highlights, setHighlights] = useState<{ row: number; col: number }[]>([]);
+	const [highlights, setHighlights] = useState<{ row: number; col: number; color: string }[]>([]);
 
 	const [structuredBoard, setStructuredBoard] = useState<(Piece | null)[][]>([]);
 
@@ -22,9 +22,12 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 			while (bb) {
 				const sq = lsb(bb);
 				bb &= bb - 1n; // clear LSB
-				grid[sq >> 3][sq & 7] = p as Piece;
+
+				const index = flip ? 63 - sq : sq;
+				grid[index >> 3][index & 7] = p as Piece;
 			}
 		}
+
 		return grid;
 	}
 
@@ -36,49 +39,53 @@ export default function ChessboardDisplay({ squareDim, chessboard, onMove, displ
 		<DndProvider backend={HTML5Backend}>
 			<div className="select-none">
 				{
-					structuredBoard.map((row, rowIndex) => (
-						<div key={rowIndex} className="flex flex-row">
-							{
-								displayCoordinates &&
-                                <div className="flex items-end justify-end">
-                                    <p className={`pr-3 font-mono ${hoveredCell?.row == rowIndex ? (isMouseDown ? "text-orange-400" : "text-white") : "text-slate-400"}`}>{chessboard.length-rowIndex}</p>
-                                </div>
-							}
+					structuredBoard.map((row, _rowIndex) => {
+						const rowIndex = flip ? 7 - _rowIndex : _rowIndex;
+						return (
+							<div key={rowIndex} className="flex flex-row">
+								{
+									displayCoordinates &&
+                                    <div className="flex items-end justify-end">
+                                        <p className={`pr-3 font-mono ${hoveredCell?.row == rowIndex ? (isMouseDown ? "text-orange-400" : "text-white") : "text-slate-400"}`}>{chessboard.length-rowIndex}</p>
+                                    </div>
+								}
 
-							{
-								row.map((piece, colIndex) => {
-									const isWhiteSquare = (rowIndex + colIndex) % 2 === 0;
+								{
+									row.map((piece, _colIndex) => {
+										const colIndex = flip ? 7 - _colIndex : _colIndex;
+										const isWhiteSquare = (rowIndex + colIndex) % 2 === 0;
 
-									return <div
-										key={colIndex}
-										onMouseEnter={() => setHoveredCell({ row: rowIndex, col: colIndex })}
-										onMouseLeave={() => setHoveredCell(null)}
-									>
-										<Square
-											movePieceHere={(fromRow, fromCol) => {
-												if (disable) return;
-												onMove(makeMove(squareIndex(fromRow, fromCol), squareIndex(rowIndex, colIndex)));
-											}}
-											row={rowIndex}
-											col={colIndex}
-											squareDim={squareDim}
-											white={isWhiteSquare}
-											piece={piece}
-											setIsMouseDown={setIsMouseDown}
-											onDrag={() => {
-												if (disable) return;
+										return <div
+											key={colIndex}
+											onMouseEnter={() => setHoveredCell({ row: rowIndex, col: colIndex })}
+											onMouseLeave={() => setHoveredCell(null)}
+										>
+											<Square
+												movePieceHere={(fromRow, fromCol) => {
+													if (disable) return;
+													onMove(makeMove(squareIndex(fromRow, fromCol), squareIndex(rowIndex, colIndex)));
+												}}
+												row={rowIndex}
+												col={colIndex}
+												squareDim={squareDim}
+												white={isWhiteSquare}
+												piece={piece}
+												setIsMouseDown={setIsMouseDown}
+												onDrag={() => {
+													if (disable) return;
 
-												const newHighlights = getHighlights(rowIndex, colIndex);
-												setHighlights(newHighlights);
-											}}
-									        highlight={disable ? "none" : highlights.some(h => h.row === rowIndex && h.col === colIndex) ? (piece === null ? "possible" : "danger") : "none"}
-											disabled={disable ?? false}
-										/>
-									</div>
-								})
-							}
-						</div>
-					))
+													const newHighlights = getHighlights(rowIndex, colIndex);
+													setHighlights(newHighlights);
+												}}
+												highlight={disable ? "" : highlights.find(h => h.row === rowIndex && h.col === colIndex)?.color ?? ""}
+												disabled={disable ?? false}
+											/>
+										</div>
+									})
+								}
+							</div>
+						)
+					})
 				}
 				{
 					displayCoordinates && (
