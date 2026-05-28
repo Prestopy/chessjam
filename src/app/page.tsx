@@ -1,5 +1,5 @@
 "use client";
-import {useEffect, useRef, useState} from "react";
+import {Fragment, useEffect, useRef, useState} from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import {Chess} from "@/app/Chess";
 import {pieceColor} from "@/app/utils/utils";
@@ -9,6 +9,11 @@ import {Color, EngineDiagnostics, GameDetails, GameState, Move, SquareHighlight}
 import {allEngines, EngineVersion, getEngineDetail} from "@/app/engines/engineDetails";
 
 export default function Home() {
+	const [gameStarted, setGameStarted] = useState(false);
+	const begin = () => {
+		setGameStarted(true);
+	}
+
 	const chessGame = useRef(new Chess(8, 8));
 	const engine = useRef<Engine | null>(null);
 	const [engineVer, setEngineVer] = useState<EngineVersion | null>(null);
@@ -133,8 +138,6 @@ export default function Home() {
 		}
 	}, [currentTurn, engineVer]);
 
-	const pointCounterWidth = 500;
-
 	return (
 		<div className="min-w-screen min-h-screen flex flex-col items-center justify-center bg-zinc-900 text-white p-6">
 			<h1 className="text-4xl font-mono font-bold mb-5">
@@ -144,16 +147,17 @@ export default function Home() {
 				)}
 			</h1>
 
-			<div className="flex flex-row items-center justify-center gap-4 mb-6">
-				<div style={{ width: pointCounterWidth, height: 12, background: "#000000" }} className="rounded overflow-hidden border border-zinc-700">
-					<div style={{ width: pointCounterWidth/(chessGame.current.countPoints(Color.White)+chessGame.current.countPoints(Color.Black))*chessGame.current.countPoints(Color.White), height: "100%", background: "#ffffff" }} />
-				</div>
-			</div>
-
 			{/* Main Layout Container */}
 			<div className="flex flex-row justify-center items-stretch gap-10 max-w-6xl w-full">
 
+
 				{/* Left Area: Board Display */}
+				<div>
+					<div style={{ width: 12, height: "100%", background: "#ffffff" }} className="rounded overflow-hidden border border-zinc-700">
+						<div style={{ width: "100%", height: `${(chessGame.current.countPoints(Color.Black)/(chessGame.current.countPoints(Color.Black)+chessGame.current.countPoints(Color.White)))*100}%`, background: "#000000" }} />
+					</div>
+				</div>
+
 				<div className="flex flex-col items-center justify-center">
 					<div
 						className="w-full h-8 flex flex-row justify-center items-center font-mono font-bold mb-2 rounded"
@@ -165,83 +169,54 @@ export default function Home() {
 					>
 						{gameState.state !== GameState.Running && <p>{gameState.winner === Color.White ? "White" : "Black"} wins</p>}
 					</div>
-
 					<ChessboardDisplay
-						squareDim={75}
+						squareDim={85}
 						flip
 						chessboard={chessPosition}
 						onMove={handleMove}
 						getHighlights={getHighlightsForSquare}
-						disable={gameState.state !== GameState.Running}
+						disable={!gameStarted || gameState.state !== GameState.Running}
 					/>
 				</div>
 
-				{/* Right Area: Telemetry Diagnostics Panel */}
-				{engineVer !== null && (
-					<div className="w-80 bg-zinc-800 border-2 border-zinc-700 rounded-lg p-5 flex flex-col justify-between shadow-xl font-mono">
-						<div>
-							<h2 className="text-xl font-bold border-b border-zinc-700 pb-2 mb-4 text-emerald-400 flex items-center gap-2">
-								Live Diagnostics
-							</h2>
+				{/* Right Area: Info stiiiff */}
+				{
+					gameStarted ? (
+							<div className="w-96">
+								<div className="flex flex-row gap-2 items-center mt-8">
 
-							{diagnostics ? (
-								<div className="space-y-4 text-sm">
-									<div>
-										<span className="block text-xs uppercase tracking-wider text-zinc-400">Current Eval</span>
-										<span className={`text-2xl font-bold ${diagnostics.currentEval >= 0 ? 'text-white' : 'text-zinc-400'}`}>
-                                         {diagnostics.currentEval > 0 ? `+${diagnostics.currentEval}` : diagnostics.currentEval}
-                                     </span>
-									</div>
-									<div className="grid grid-cols-2 gap-4 border-t border-zinc-700/50 pt-3">
-										<div>
-											<span className="block text-xs uppercase tracking-wider text-zinc-400">Depth</span>
-											<span className="text-lg font-bold text-zinc-200">{diagnostics.depthReached} plies</span>
-										</div>
-										<div>
-											<span className="block text-xs uppercase tracking-wider text-zinc-400">Speed</span>
-											<span className="text-lg font-bold text-zinc-200">
-                                             {diagnostics.timeElapsedMs > 0 ? Math.round((diagnostics.nodesVisited / diagnostics.timeElapsedMs) * 1000) : 0} n/s
-                                         </span>
-										</div>
-									</div>
-									<div className="border-t border-zinc-700/50 pt-3">
-										<span className="block text-xs uppercase tracking-wider text-zinc-400">Nodes Explored</span>
-										<span className="text-base text-zinc-300 font-bold">{diagnostics.nodesVisited.toLocaleString()}</span>
-									</div>
-									{diagnostics.bestMove && (
-										<div className="border-t border-zinc-700/50 pt-3">
-											<span className="block text-xs uppercase tracking-wider text-zinc-400">Pondering Line</span>
-											<span className="inline-block bg-zinc-900 px-2 py-1 rounded text-emerald-300 font-bold mt-1">{diagnostics.bestMove}</span>
-										</div>
-									)}
 								</div>
-							) : (
-								<p className="text-zinc-500 italic text-sm text-center py-10">Waiting for engine to calculate...</p>
-							)}
-						</div>
+							</div>
+						) : (
+							<div className="w-96 border-white border p-4 flex flex-col gap-4">
+								<div>
+									<label className="font-bold font-mono text-sm pr-2">Opponent:</label>
+									<select
+										className="font-mono bg-zinc-800 text-white border border-zinc-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-emerald-500 w-32"
+										value={engineVer ?? "--"}
+										onChange={(e) => {
+											if (e.target.value.startsWith("--")) handleSetEngine(null);
+											else handleSetEngine(e.target.value as EngineVersion | null);
+										}}
+									>
+										<option value="--">Human</option>
+										<optgroup label="ENGINES">
+											{allEngines.map((details, i) => (
+												<Fragment key={i}>
+													<option value={details.version}>v{details.version}</option>
+													<option value="##" disabled>{details.name}</option>
+												</Fragment>
+											))}
+										</optgroup>
+									</select>
+								</div>
 
-						<div className="text-xs text-zinc-500 text-center border-t border-zinc-700/50 pt-3 mt-4">
-							Engine Active: v{engineVer}
-						</div>
-					</div>
-				)}
-			</div>
-
-			<div className="flex flex-row gap-2 items-center mt-8">
-				<label className="font-bold font-mono text-sm">Opponent:</label>
-				<select
-					className="font-mono bg-zinc-800 text-white border border-zinc-700 rounded px-2 py-1 text-sm focus:outline-none focus:border-emerald-500"
-					value={engineVer ?? "--"}
-					onChange={(e) => {
-						if (e.target.value === "--") handleSetEngine(null);
-						else handleSetEngine(e.target.value as EngineVersion | null);
-					}}
-				>
-					<option key={-1} value="--">Human</option>
-					{allEngines.map((details, i) => (
-						<option key={i} value={details.version}>v{details.version} - {details.name}</option>
-					))}
-				</select>
+								<button onClick={begin} className="px-8 py-2 bg-emerald-500 rounded-lg">
+									Start game
+								</button>
+							</div>
+						)
+				}
 			</div>
 		</div>
 	);

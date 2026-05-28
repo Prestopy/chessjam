@@ -65,7 +65,7 @@ export default function Square({ movePieceHere, row, col, squareDim, white, piec
 				isOver: monitor.isOver()
 			})
 		}),
-		[row, col]
+		[row, col, disabled]
 	)
 
 	useEffect(() => {

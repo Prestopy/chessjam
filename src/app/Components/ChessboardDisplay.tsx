@@ -7,7 +7,7 @@ import {Board, Move, Piece, SquareHighlight} from "@/app/utils/types";
 import {lsb} from "@/app/utils/bitUtils";
 import {squareIndex} from "@/app/utils/utils";
 
-export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, flip: boolean, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (sq?: number) => SquareHighlight[], disable?: boolean }) {
+export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove, displayCoordinates, getHighlights, disable }: { squareDim: number, flip?: boolean, chessboard: Board, onMove: (move: Move) => void, displayCoordinates?: boolean, getHighlights: (sq?: number) => SquareHighlight[], disable?: boolean }) {
 	const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null);
 	const [isMouseDown, setIsMouseDown] = useState(false);
 
@@ -74,7 +74,6 @@ export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove,
 												setIsMouseDown={setIsMouseDown}
 												onDrag={() => {
 													if (disable) return;
-
 													const newHighlights = getHighlights(squareIndex(rowIndex, colIndex));
 													setHighlights(newHighlights);
 												}}
