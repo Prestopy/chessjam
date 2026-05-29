@@ -1,10 +1,24 @@
 import { Color, MoveFlag } from "@/app/utils/types";
-import { GeneratorContext } from "@/app/Generator";
+import { GeneratorContext } from "@/app/generator/Generator";
 import { isDoublePushMove, moveToSq } from "@/app/Move";
-import { MoveGeometry, GeometryResult } from "@/app/geometries/MoveGeometry";
+import {MoveGeometry, GeometryResult, GeometryDetails} from "@/app/generator/geometries/MoveGeometry";
 import {squareMask} from "@/app/utils/bitboardHelpers";
+import {CanOnlyCapture} from "@/app/generator/geometries/CanOnlyCapture";
 
-export class EnPassantGeometry implements MoveGeometry {
+export class EnPassantGeometry extends CanOnlyCapture<BaseEnPassantGeometry> {
+	getGeom() {
+		return new BaseEnPassantGeometry();
+	}
+}
+
+class BaseEnPassantGeometry implements MoveGeometry {
+	public getDetails(): GeometryDetails {
+		return {
+			name: "En Passant",
+			moveDesc: "",
+			captureDesc: "one square diagonally in the forward direction if the opponent's last move was a double pawn push that landed adjacent to this piece"
+		}
+	}
 
 	public getAttackMask(fromSq: number, color: Color, ctx: GeneratorContext): GeometryResult {
 		let mask = 0n;

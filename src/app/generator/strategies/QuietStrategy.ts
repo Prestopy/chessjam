@@ -1,13 +1,15 @@
-import {CaptureStrategy} from "@/app/strategies/CaptureStrategy";
+import {CaptureStrategy} from "@/app/generator/strategies/CaptureStrategy";
 import {Color, Move, MoveFlag} from "@/app/utils/types";
-import {GeneratorContext} from "@/app/Generator";
+import {GeneratorContext} from "@/app/generator/Generator";
 import {not64} from "@/app/utils/bitUtils";
 import {allOccupancy} from "@/app/utils/bitboardHelpers";
 import {addMovesWithFlags} from "@/app/Move";
-import {MoveGeometry} from "@/app/geometries/MoveGeometry";
+import {MoveGeometry} from "@/app/generator/geometries/MoveGeometry";
+import {CannotCapture} from "@/app/generator/geometries/CannotCapture";
+import {CanOnlyCapture} from "@/app/generator/geometries/CanOnlyCapture";
 
 export class QuietStrategy {
-	constructor(private geometry: MoveGeometry) {}
+	constructor(private geometry: MoveGeometry | CannotCapture<MoveGeometry>) {}
 
 	public capturesOnly(): CaptureStrategy {
 		return new CaptureStrategy(this.geometry);
@@ -15,7 +17,12 @@ export class QuietStrategy {
 
 	public generateQuiet(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {
 		const moves: Move[] = [];
-		const { attackMask, flag } = this.geometry.getAttackMask(fromSq, color, ctx);
+
+		let geom: MoveGeometry;
+		if (this.geometry instanceof CannotCapture) geom = this.geometry.getGeom();
+		else geom = this.geometry;
+
+		const { attackMask, flag } = geom.getAttackMask(fromSq, color, ctx);
 
 		const filtered = attackMask & not64(allOccupancy(ctx.board));
 

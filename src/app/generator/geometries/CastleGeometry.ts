@@ -1,9 +1,24 @@
 import { allOccupancy, FILE_B, FILE_C, FILE_D, FILE_F, FILE_G, RANK } from "@/app/utils/bitboardHelpers";
-import { Color, MoveFlag } from "@/app/utils/types";
-import { GeneratorContext } from "@/app/Generator";
-import { MoveGeometry, GeometryResult } from "@/app/geometries/MoveGeometry";
+import {Color, Move, MoveFlag} from "@/app/utils/types";
+import { GeneratorContext } from "@/app/generator/Generator";
+import {MoveGeometry, GeometryResult, GeometryDetails} from "@/app/generator/geometries/MoveGeometry";
+import {CannotCapture} from "@/app/generator/geometries/CannotCapture";
 
-export class CastleGeometry implements MoveGeometry {
+export class CastleGeometry extends CannotCapture<BaseCastleGeometry> {
+	getGeom() {
+		return new BaseCastleGeometry();
+	}
+}
+
+class BaseCastleGeometry implements MoveGeometry {
+	public getDetails(): GeometryDetails {
+		return {
+			name: "Castle",
+			moveDesc: `towards the rooks on the home rank if castling rights are available and the path is clear`,
+			captureDesc: ""
+		}
+	}
+
 	public getAttackMask(fromSq: number, color: Color, ctx: GeneratorContext): GeometryResult {
 		let mask = 0n;
 		const occupied = allOccupancy(ctx.board);

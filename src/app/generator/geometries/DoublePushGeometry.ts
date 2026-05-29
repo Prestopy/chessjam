@@ -1,8 +1,8 @@
 import { BasePushGeometry } from "./BasePushGeometry";
-import { GeneratorContext } from "@/app/Generator";
+import { GeneratorContext } from "@/app/generator/Generator";
 import { Color, MoveFlag } from "@/app/utils/types";
 import { allOccupancy, squareMask } from "@/app/utils/bitboardHelpers";
-import { MoveGeometry, GeometryResult } from "@/app/geometries/MoveGeometry";
+import {MoveGeometry, GeometryResult, GeometryDetails} from "@/app/generator/geometries/MoveGeometry";
 
 export interface DoublePushConfig {
 	whiteDoublePushRank: number; // Row index destination (e.g., 3 for Rank 4)
@@ -17,6 +17,14 @@ export class DoublePushGeometry extends BasePushGeometry implements MoveGeometry
 		}
 	) {
 		super();
+	}
+
+	public getDetails(): GeometryDetails {
+		return {
+			name: "Double Push",
+			moveDesc: `two squares forward from rank ${this.doubleConfig.whiteDoublePushRank - 2 + 1} (white)/rank ${this.doubleConfig.blackDoublePushRank + 2 + 1} (black) if both squares are unoccupied`,
+			captureDesc: `two squares forward from rank ${this.doubleConfig.whiteDoublePushRank - 2 + 1} (white)/rank ${this.doubleConfig.blackDoublePushRank + 2 + 1} (black) if both squares are unoccupied`,
+		}
 	}
 
 	public getAttackMask(fromSq: number, color: Color, ctx: GeneratorContext): GeometryResult {

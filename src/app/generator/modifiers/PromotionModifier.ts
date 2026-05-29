@@ -1,6 +1,6 @@
 import { Color, Move, PieceName } from "@/app/utils/types";
 import { moveToRow, setPromotionPiece } from "@/app/Move";
-import {StrategyModifier} from "@/app/modifiers/StrategyModifier";
+import {StrategyModifier} from "@/app/generator/modifiers/StrategyModifier";
 import {makePiece} from "@/app/utils/utils";
 
 export interface PromotionConfig {

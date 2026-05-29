@@ -1,5 +1,5 @@
 import {makePiece, pieceColor, pieceName, squareIndex, standardChessSetup, swapColor} from "@/app/utils/utils";
-import {Generator, GeneratorContext} from "@/app/Generator";
+import {FullStrategy, Generator, GeneratorContext} from "@/app/generator/Generator";
 import {colorOccupancy, squareMask} from "@/app/utils/bitboardHelpers";
 import {
 	disectMove,
@@ -63,7 +63,7 @@ export class Chess {
 		this.gameDetails = { state: GameState.Running, winner: null };
 		this.materialScore = this.computeMaterialScore();
 
-		this.generator = new Generator()
+		this.generator = Generator.standardRules();
 	}
 
 	// GETTERS #########################################################################################################
