@@ -2,7 +2,7 @@
 import {Color, Move, MoveFlag} from "@/app/utils/types";
 import {GeneratorContext} from "@/app/Generator";
 import {enemyOccupancy} from "@/app/utils/bitboardHelpers";
-import {addCapturesWithFlags, addMoves, addMovesWithFlags} from "@/app/Move";
+import {addCapturesWithFlags, addMovesWithFlags} from "@/app/Move";
 import {MoveGeometry} from "@/app/geometries/MoveGeometry";
 
 export class CaptureStrategy {
