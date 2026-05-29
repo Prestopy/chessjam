@@ -16,6 +16,7 @@ import { SliderGeometry } from "@/app/geometries/SliderGeometry";
 import { QuietStrategy } from "@/app/strategies/QuietStrategy";
 import { CaptureStrategy } from "@/app/strategies/CaptureStrategy";
 import {StrategyModifier} from "@/app/modifiers/StrategyModifier";
+import {PromotionModifier} from "@/app/modifiers/PromotionModifier";
 
 export interface GeneratorContext {
 	board: Board;
@@ -46,7 +47,7 @@ export class Generator {
 				new CaptureStrategy(new DiagonalGeometry()),
 				new CaptureStrategy(new EnPassantGeometry())
 			],
-			modifiers: [] // Can push a PromotionModifier instance here if available
+			modifiers: [new PromotionModifier()]
 		});
 
 		// --- KNIGHT RULES SETUP ---

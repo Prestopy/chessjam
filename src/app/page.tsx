@@ -4,7 +4,7 @@ import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import { Chess } from "@/app/Chess";
 import { pieceColor } from "@/app/utils/utils";
 import { Engine } from "@/app/engines/Engine";
-import { isCaptureMove, isCastleMove, moveFromCol, moveFromRow, moveToCol, moveToRow } from "@/app/Move";
+import {isCaptureMove, isCastleMove, isEnPassantMove, moveFromCol, moveFromRow, moveToCol, moveToRow} from "@/app/Move";
 import { Color, EngineDiagnostics, GameDetails, GameState, Move, SquareHighlight } from "@/app/utils/types";
 import { allEngines, EngineVersion, getEngineDetail } from "@/app/engines/engineDetails";
 
@@ -100,11 +100,12 @@ export default function Home() {
 			const piece = game.getSquare(sq >> 3, sq & 7);
 			if (piece === null || game.getTurn() !== pieceColor(piece)) return [];
 
-			highlights.push(...game.generateMoves(sq >> 3, sq & 7, true).map(m => ({
+			const moves = game.generateMoves(sq >> 3, sq & 7, true);
+			highlights.push(...moves.map(m => ({
 				row: moveToRow(m),
 				col: moveToCol(m),
-				color: isCaptureMove(m) ? CAPTURE : WHITE,
-				type: isCaptureMove(m) ? "highlight" as const : "dot" as const,
+				color: isCaptureMove(m) || isEnPassantMove(m) ? CAPTURE : WHITE,
+				type: isCaptureMove(m) || isEnPassantMove(m) ? "highlight" as const : "dot" as const,
 			})));
 		}
 
