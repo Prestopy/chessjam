@@ -1,5 +1,5 @@
 import {makePiece, pieceColor, pieceName, squareIndex, standardChessSetup, swapColor} from "@/app/utils/utils";
-import {Generator, GeneratorContext} from "@/app/generators/generators";
+import {Generator, GeneratorContext} from "@/app/Generator";
 import {colorOccupancy, squareMask} from "@/app/utils/bitboardHelpers";
 import {
 	disectMove,

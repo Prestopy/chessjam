@@ -1,0 +1,49 @@
+import { PieceStrategy } from "@/app/strategies/Strategy";
+import { Color, Move, PieceName } from "@/app/utils/types";
+import { GeneratorContext } from "@/app/Generator";
+import { moveToRow, setPromotionPiece } from "@/app/Move";
+import {StrategyModifier} from "@/app/strategies/StrategyModifier";
+import {makePiece} from "@/app/utils/utils";
+
+export interface PromotionConfig {
+	whitePromotionRank: number;
+	blackPromotionRank: number;
+	allowedPieces: PieceName[];
+}
+
+export class PromotionStrategy implements StrategyModifier {
+	constructor(
+		private config: PromotionConfig = {
+			whitePromotionRank: 7,
+			blackPromotionRank: 0,
+			allowedPieces: [PieceName.Queen, PieceName.Rook, PieceName.Bishop, PieceName.Knight]
+		}
+	) {}
+
+	/**
+	 * Satisfies the core interface. Returns empty because promotion rules
+	 * are applied to a collection of pre-existing paths.
+	 */
+	generate(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {
+		return [];
+	}
+
+	/**
+	 * Intercepts and transforms standard moves into promotion instances if criteria match.
+	 */
+	apply(moves: Move[], color: Color): Move[] {
+		const targetPromoRank = color === Color.White ? this.config.whitePromotionRank : this.config.blackPromotionRank;
+
+		for (let i = moves.length - 1; i >= 0; i--) {
+			if (moveToRow(moves[i]) === targetPromoRank) {
+				// Generate a clone for every option in our allowed variant list
+				for (const pieceName of this.config.allowedPieces) {
+					moves.push(setPromotionPiece(moves[i], makePiece(pieceName, color)));
+				}
+				// Splice out the original baseline pawn target move
+				moves.splice(i, 1);
+			}
+		}
+		return moves;
+	}
+}

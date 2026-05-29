@@ -86,6 +86,18 @@ export function addCaptureMoves(result: Move[], fromSq: number, bb: bigint, boar
 	}
 }
 
+export function addCapturesWithFlags(result: Move[], fromSq: number, bb: bigint, board: Board, flags: MoveFlag) {
+	while(bb > 0n) {
+		const toSq = lsb(bb);
+		bb &= bb - 1n; // clear LSB
+
+		const piece = getBoardSquare(board, toSq);
+		if (piece === null) throw new Error('Invalid capture move; no piece found on square indicated by bitboard');
+
+		result.push(makeMove(fromSq, toSq, flags | MoveFlag.Capture, piece))
+	}
+}
+
 // --- Decoders ---
 export function moveFromSq(m: Move):   number { return  m        & 0x3f; }
 export function moveToSq(m: Move):     number { return (m >> 6)  & 0x3f; }
