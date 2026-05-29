@@ -1,17 +1,21 @@
-import {Board, Move, MoveHistoryEntry, Piece, PieceName} from "@/app/utils/types";
-import {PieceStrategy} from "@/app/strategies/Strategy";
-import {LeaperStrategy} from "@/app/strategies/LeaperStrategy";
-import {getBishopAttacks, getKnightAttacks, getRookAttacks} from "@/app/strategies/attacks";
-import {SliderStrategy} from "@/app/strategies/SliderStrategy";
-import {pieceColor, pieceName} from "@/app/utils/utils";
-import {AroundStrategy} from "@/app/strategies/AroundStrategy";
-import {CastleStrategy} from "@/app/strategies/CastleStrategy";
-import {SinglePushStrategy} from "@/app/strategies/SinglePushStrategy";
-import {DoublePushStrategy} from "@/app/strategies/DoublePushStrategy";
-import {StrategyModifier} from "@/app/strategies/StrategyModifier";
-import {PromotionStrategy} from "@/app/strategies/PromotionStrategy";
-import {DiagonalCaptureStrategy} from "@/app/strategies/DiagonalCaptureStrategy";
-import {EnPassantStrategy} from "@/app/strategies/EnPassantStrategy";
+import { Board, Move, MoveHistoryEntry, Piece, PieceName } from "@/app/utils/types";
+import { getBishopAttacks, getKnightAttacks, getRookAttacks } from "@/app/strategies/attacks";
+import { pieceColor, pieceName } from "@/app/utils/utils";
+
+// Import Geometry Layer
+import { AroundGeometry } from "@/app/geometries/AroundGeometry";
+import { CastleGeometry } from "@/app/geometries/CastleGeometry";
+import { DiagonalGeometry } from "@/app/geometries/DiagonalGeometry";
+import { EnPassantGeometry } from "@/app/geometries/EnPassantGeometry";
+import { LeaperGeometry } from "@/app/geometries/LeaperGeometry";
+import { SinglePushGeometry } from "@/app/geometries/SinglePushGeometry";
+import { DoublePushGeometry } from "@/app/geometries/DoublePushGeometry";
+import { SliderGeometry } from "@/app/geometries/SliderGeometry";
+
+// Import Unified Strategy Execution Layer
+import { QuietStrategy } from "@/app/strategies/QuietStrategy";
+import { CaptureStrategy } from "@/app/strategies/CaptureStrategy";
+import {StrategyModifier} from "@/app/modifiers/StrategyModifier";
 
 export interface GeneratorContext {
 	board: Board;
@@ -19,14 +23,12 @@ export interface GeneratorContext {
 	castlingRights: {
 		kingSide: boolean;
 		queenSide: boolean;
-	}
+	};
 }
 
-// TODO: separate class for move and captures (.capturesOnly() returns a CapturesOnly variant)
-// TODO: En Passant will have the CapturesOnly variant only.
 interface FullStrategy {
-	move: PieceStrategy[];
-	capture: PieceStrategy[];
+	move: QuietStrategy[];
+	capture: CaptureStrategy[];
 	modifiers?: StrategyModifier[];
 }
 
@@ -34,38 +36,57 @@ export class Generator {
 	private strategies = new Map<PieceName, FullStrategy>();
 
 	constructor() {
-		// Register default rules setups
+		// --- PAWN RULES SETUP ---
 		this.strategies.set(PieceName.Pawn, {
 			move: [
-				new SinglePushStrategy(),
-				new DoublePushStrategy({
-					whiteDoublePushRank: 3,
-					blackDoublePushRank: 4
-				})],
-			capture: [new DiagonalCaptureStrategy().capturesOnly(), new EnPassantStrategy().capturesOnly()],
-			modifiers: [new PromotionStrategy()]
-		});
-		this.strategies.set(PieceName.Knight, {
-			move: [new LeaperStrategy(getKnightAttacks)],
-			capture: [new LeaperStrategy(getKnightAttacks).capturesOnly()],
-		});
-		this.strategies.set(PieceName.King, {
-			move: [new AroundStrategy({ dist: 1}), new CastleStrategy()],
-			capture: [new AroundStrategy({ dist: 1}).capturesOnly()],
-		});
-		this.strategies.set(PieceName.Rook, {
-			move: [new SliderStrategy(getRookAttacks)],
-			capture: [new SliderStrategy(getRookAttacks).capturesOnly()],
-		});
-		this.strategies.set(PieceName.Bishop, {
-			move: [new SliderStrategy(getBishopAttacks)],
-			capture: [new SliderStrategy(getBishopAttacks).capturesOnly()],
+				new QuietStrategy(new SinglePushGeometry()),
+				new QuietStrategy(new DoublePushGeometry())
+			],
+			capture: [
+				new CaptureStrategy(new DiagonalGeometry()),
+				new CaptureStrategy(new EnPassantGeometry())
+			],
+			modifiers: [] // Can push a PromotionModifier instance here if available
 		});
 
-		// Queen is just combined sliding lookups
+		// --- KNIGHT RULES SETUP ---
+		const knightGeom = new LeaperGeometry(getKnightAttacks);
+		this.strategies.set(PieceName.Knight, {
+			move: [new QuietStrategy(knightGeom)],
+			capture: [new CaptureStrategy(knightGeom)],
+		});
+
+		// --- KING RULES SETUP ---
+		const kingGeom = new AroundGeometry({ dist: 1 });
+		this.strategies.set(PieceName.King, {
+			move: [
+				new QuietStrategy(kingGeom),
+				new QuietStrategy(new CastleGeometry()) // Castling is fundamentally a unique quiet move
+			],
+			capture: [new CaptureStrategy(kingGeom)],
+		});
+
+		// --- ROOK RULES SETUP ---
+		const rookGeom = new SliderGeometry(getRookAttacks);
+		this.strategies.set(PieceName.Rook, {
+			move: [new QuietStrategy(rookGeom)],
+			capture: [new CaptureStrategy(rookGeom)],
+		});
+
+		// --- BISHOP RULES SETUP ---
+		const bishopGeom = new SliderGeometry(getBishopAttacks);
+		this.strategies.set(PieceName.Bishop, {
+			move: [new QuietStrategy(bishopGeom)],
+			capture: [new CaptureStrategy(bishopGeom)],
+		});
+
+		// --- QUEEN RULES SETUP ---
+		const queenGeom = new SliderGeometry((sq, occupied) =>
+			getRookAttacks(sq, occupied) | getBishopAttacks(sq, occupied)
+		);
 		this.strategies.set(PieceName.Queen, {
-			move: [new SliderStrategy((sq, occupied) => getRookAttacks(sq, occupied) | getBishopAttacks(sq, occupied))],
-			capture: [new SliderStrategy((sq, occupied) => getRookAttacks(sq, occupied) | getBishopAttacks(sq, occupied)).capturesOnly()],
+			move: [new QuietStrategy(queenGeom)],
+			capture: [new CaptureStrategy(queenGeom)],
 		});
 	}
 
@@ -81,9 +102,30 @@ export class Generator {
 		const strategy = this.strategies.get(pieceName(piece));
 		if (!strategy) return [];
 
-		const moves = strategy.move.reduce((acc, strat) => [...acc, ...strat.generate(fromSq, pieceColor(piece), ctx)], [] as Move[]);
-		const captures = strategy.capture.reduce((acc, strat) => [...acc, ...strat.generate(fromSq, pieceColor(piece), ctx)], [] as Move[]);
+		const color = pieceColor(piece);
 
-		return [...moves, ...captures];
+		// 1. Gather all quiet options via standard quiet pipelines
+		const moves = strategy.move.reduce(
+			(acc, strat) => [...acc, ...strat.generateQuiet(fromSq, color, ctx)],
+			[] as Move[]
+		);
+
+		// 2. Gather all capture possibilities via capturing pipelines
+		const captures = strategy.capture.reduce(
+			(acc, strat) => [...acc, ...strat.generateCaptures(fromSq, color, ctx)],
+			[] as Move[]
+		);
+
+		// Combine positional moves and captures
+		let totalMoves = [...moves, ...captures];
+
+		// 3. Post-process via any assigned execution interceptor modifiers (like Promotions)
+		if (strategy.modifiers) {
+			for (const modifier of strategy.modifiers) {
+				totalMoves = modifier.apply(totalMoves, color);
+			}
+		}
+
+		return totalMoves;
 	}
 }

@@ -79,14 +79,3 @@ export function getKnightAttacks(sq: number): bigint {
 		| sqMask >> 10n      & NOT_GH_FILE
 		| sqMask >> 6n       & NOT_AB_FILE;
 }
-export function getKingAttacks(sq: number): bigint {
-	const sqMask = squareMask(sq);
-	return u64(sqMask << 9n) & NOT_A_FILE
-		| u64(sqMask << 8n)
-		| u64(sqMask << 7n) & NOT_H_FILE
-		| u64(sqMask << 1n) & NOT_H_FILE
-		| sqMask >> 1n      & NOT_A_FILE
-		| sqMask >> 7n      & NOT_A_FILE
-		| sqMask >> 8n
-		| sqMask >> 9n      & NOT_H_FILE;
-}

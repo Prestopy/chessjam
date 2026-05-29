@@ -1,6 +1,4 @@
-import { PieceStrategy } from "@/app/strategies/Strategy";
 import { Color, Move, PieceName } from "@/app/utils/types";
-import { GeneratorContext } from "@/app/Generator";
 import { moveToRow, setPromotionPiece } from "@/app/Move";
 import {StrategyModifier} from "@/app/strategies/StrategyModifier";
 import {makePiece} from "@/app/utils/utils";
@@ -11,7 +9,7 @@ export interface PromotionConfig {
 	allowedPieces: PieceName[];
 }
 
-export class PromotionStrategy implements StrategyModifier {
+export class PromotionModifier implements StrategyModifier {
 	constructor(
 		private config: PromotionConfig = {
 			whitePromotionRank: 7,
@@ -19,14 +17,6 @@ export class PromotionStrategy implements StrategyModifier {
 			allowedPieces: [PieceName.Queen, PieceName.Rook, PieceName.Bishop, PieceName.Knight]
 		}
 	) {}
-
-	/**
-	 * Satisfies the core interface. Returns empty because promotion rules
-	 * are applied to a collection of pre-existing paths.
-	 */
-	generate(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {
-		return [];
-	}
 
 	/**
 	 * Intercepts and transforms standard moves into promotion instances if criteria match.

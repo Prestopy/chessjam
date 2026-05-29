@@ -95,7 +95,7 @@ export default function Home() {
 		const highlights: SquareHighlight[] = [];
 
 		// Move for sq if provided
-		if (sq) {
+		if (sq !== undefined) {
 			const game = chessGame.current;
 			const piece = game.getSquare(sq >> 3, sq & 7);
 			if (piece === null || game.getTurn() !== pieceColor(piece)) return [];
