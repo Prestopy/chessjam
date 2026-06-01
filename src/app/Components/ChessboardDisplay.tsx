@@ -34,7 +34,7 @@ export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove,
 	useEffect(() => {
 		setStructuredBoard(boardToGrid(chessboard, 8, 8));
 		setHighlights(getHighlights())
-	}, [chessboard]);
+	}, [chessboard, flip]);
 
 	const updateHighlights = (sq?: number) => {
 		if (disable) return;

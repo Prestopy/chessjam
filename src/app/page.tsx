@@ -2,7 +2,7 @@
 import {Fragment, useEffect, useRef, useState} from "react";
 import ChessboardDisplay from "@/app/Components/ChessboardDisplay";
 import {Chess} from "@/app/Chess";
-import {pieceColor} from "@/app/utils/utils";
+import {pieceColor, swapColor} from "@/app/utils/utils";
 import {Engine} from "@/app/engines/Engine";
 import {isCaptureMove, isCastleMove, isEnPassantMove, moveFromCol, moveFromRow, moveToCol, moveToRow} from "@/app/Move";
 import {
@@ -84,7 +84,7 @@ export default function Home() {
 	};
 
 	const handleSetPlayerColor = (playerColor: Color) => {
-		const targetEngineColor = playerColor === Color.White ? Color.Black : Color.White;
+		const targetEngineColor = swapColor(playerColor);
 		setEngineColor(targetEngineColor);
 		if (engine.current) {
 			engine.current.setColor(targetEngineColor);
@@ -159,26 +159,24 @@ export default function Home() {
 	};
 
 	useEffect(() => {
-		if (chessGame.current.getTurn() === engineColor && gameState.state === GameState.Running && engine.current) {
-			setTimeout(() => {
-				const eng = engine.current;
-				if (!eng) return;
+		if (gameStarted && chessGame.current.getTurn() === engineColor && gameState.state === GameState.Running && engine.current) {
+			const eng = engine.current;
+			if (!eng) return;
 
-				const move = eng.pickMove();
-				if (!move) {
-					alert("Error - no moves found yet game is not over");
-					return;
-				}
+			const move = eng.pickMove();
+			if (!move) {
+				alert("Error - no moves found yet game is not over");
+				return;
+			}
 
-				chessGame.current.move(move);
-				playMoveSound(move);
-				chessGame.current.nextTurn();
-				setCurrentTurn(chessGame.current.getTurn());
-				setChessPosition(chessGame.current.getBoard());
-				setGameState(chessGame.current.getGameDetails());
-			}, 500);
+			chessGame.current.move(move);
+			playMoveSound(move);
+			chessGame.current.nextTurn();
+			setCurrentTurn(chessGame.current.getTurn());
+			setChessPosition(chessGame.current.getBoard());
+			setGameState(chessGame.current.getGameDetails());
 		}
-	}, [currentTurn, engineVer]);
+	}, [currentTurn, engineVer, engineColor, gameStarted]);
 
 	const handleNextStep = () => {
 		if (setupStage === 1 && engineVer === null) {
@@ -241,7 +239,7 @@ export default function Home() {
 					<div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl">
 						<ChessboardDisplay
 							squareDim={85}
-							flip
+							flip={engineColor === Color.Black}
 							chessboard={chessPosition}
 							onMove={handleMove}
 							getHighlights={getHighlightsForSquare}
