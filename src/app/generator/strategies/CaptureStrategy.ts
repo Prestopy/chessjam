@@ -4,10 +4,14 @@ import {GeneratorContext} from "@/app/generator/Generator";
 import {enemyOccupancy} from "@/app/utils/bitboardHelpers";
 import {addCapturesWithFlags, addMovesWithFlags} from "@/app/Move";
 import {MoveGeometry} from "@/app/generator/geometries/MoveGeometry";
-import {CanOnlyCapture} from "@/app/generator/geometries/CanOnlyCapture";
+import {CanOnlyCapture} from "@/app/generator/CanOnlyCapture";
 
 export class CaptureStrategy {
-	constructor(private geometry: MoveGeometry | CanOnlyCapture<MoveGeometry>) {
+	constructor(private geometry: MoveGeometry | CanOnlyCapture<MoveGeometry>) {}
+
+	public getGeometry(): MoveGeometry {
+		if (this.geometry instanceof CanOnlyCapture) return this.geometry.getGeom();
+		else return this.geometry;
 	}
 
 	public generateCaptures(fromSq: number, color: Color, ctx: GeneratorContext): Move[] {

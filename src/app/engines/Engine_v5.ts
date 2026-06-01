@@ -69,7 +69,7 @@ export default class Engine_v5 extends Engine {
 		let bestMoves: Move[] = [];
 		let alpha = -Infinity;
 
-		const simulatedGame = this.chessGame.copy();
+		const simulatedGame = this.chessGame.clone();
 
 		for (let i = 0; i < allMoves.length; i++) {
 			const move = allMoves[i];

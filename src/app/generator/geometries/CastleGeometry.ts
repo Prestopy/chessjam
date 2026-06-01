@@ -2,7 +2,7 @@ import { allOccupancy, FILE_B, FILE_C, FILE_D, FILE_F, FILE_G, RANK } from "@/ap
 import {Color, Move, MoveFlag} from "@/app/utils/types";
 import { GeneratorContext } from "@/app/generator/Generator";
 import {MoveGeometry, GeometryResult, GeometryDetails} from "@/app/generator/geometries/MoveGeometry";
-import {CannotCapture} from "@/app/generator/geometries/CannotCapture";
+import {CannotCapture} from "@/app/generator/CannotCapture";
 
 export class CastleGeometry extends CannotCapture<BaseCastleGeometry> {
 	getGeom() {

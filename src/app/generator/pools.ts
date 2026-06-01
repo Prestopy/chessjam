@@ -11,8 +11,8 @@ import {EnPassantGeometry} from "@/app/generator/geometries/EnPassantGeometry";
 import {CastleGeometry} from "@/app/generator/geometries/CastleGeometry";
 import {StrategyModifier} from "@/app/generator/modifiers/StrategyModifier";
 import {PromotionModifier} from "@/app/generator/modifiers/PromotionModifier";
-import {CannotCapture} from "@/app/generator/geometries/CannotCapture";
-import {CanOnlyCapture} from "@/app/generator/geometries/CanOnlyCapture";
+import {CannotCapture} from "@/app/generator/CannotCapture";
+import {CanOnlyCapture} from "@/app/generator/CanOnlyCapture";
 
 export const GEOMETRY_POOL: (() => MoveGeometry)[] = [
 	() => new SliderGeometry(getRookAttacks, {

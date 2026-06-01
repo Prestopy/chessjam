@@ -1,6 +1,6 @@
 import {useDrag, useDrop} from "react-dnd";
 import {useEffect} from "react";
-import {Piece, SquareHighlight} from "@/app/utils/types";
+import {Piece, SquareHighlight, STRING_PIECE_NAMES} from "@/app/utils/types";
 import {pieceSymbols} from "@/app/utils/constants";
 import {pieceColor, pieceName, squareIndex} from "@/app/utils/utils";
 
@@ -73,14 +73,25 @@ export default function Square({ movePieceHere, row, col, squareDim, white, piec
 		onDrag();
 	}, [isDragging])
 
+	const goToRule = () => {
+		if (disabled) return;
+		if (piece !== null) {
+			window.location.href = `/#${STRING_PIECE_NAMES[pieceName(piece)].toLowerCase()}`
+		}
+	}
+
 	return (
 		<div ref={(node) => {drop(drag(node))}} style={squareStyle}>
-			<div className="relative w-full h-full flex items-center justify-center" style={{
-				backgroundColor: highlight?.type === "highlight" ? highlight?.color : "",
-				opacity: isDragging ? 0.25 : 1,
-				cursor: "move",
-				boxShadow: isOver ? (highlight ? "inset 0 0 0 4px rgb(0, 255, 255)" : "inset 0 0 0 4px rgb(255, 0, 0)") : "none"
-			}}>
+			<div
+				className="relative w-full h-full flex items-center justify-center" style={{
+					backgroundColor: highlight?.type === "highlight" ? highlight?.color : "",
+					opacity: isDragging ? 0.25 : 1,
+					cursor: "move",
+					boxShadow: isOver ? (highlight ? "inset 0 0 0 4px rgb(0, 255, 255)" : "inset 0 0 0 4px rgb(255, 0, 0)") : "none"
+				}}
+				onDrag={goToRule}
+				onClick={goToRule}
+			>
 				{
 					piece === null ? null : <img width={squareDim-squarePadding} src={pieceSymbols[pieceName(piece)][pieceColor(piece)]} draggable={!disabled}/>
 				}

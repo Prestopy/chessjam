@@ -7,7 +7,7 @@ import {
 	isCastleMove,
 	isEnPassantMove,
 	isPromotionMove,
-	moveCaptured,
+	moveCaptured, moveFromCol, moveFromRow,
 	movePromotion,
 	moveToCol,
 	moveToRow,
@@ -92,9 +92,13 @@ export class Chess {
 		return this;
 	}
 
-	setBoard(b: Board): void {
-		this.board = b;
-		this.materialScore = this.computeMaterialScore();
+	// setBoard(b: Board): void {
+	// 	this.board = b;
+	// 	this.materialScore = this.computeMaterialScore();
+	// }
+
+	setGenerator(g: Generator): void {
+		this.generator = g;
 	}
 
 	setSquare(row: number, col: number, piece: Piece | null): void {
@@ -343,7 +347,6 @@ export class Chess {
 			occ &= occ - 1n; // clear LSB
 			const row = Number(sq) >> 3;
 			const col = Number(sq) & 7;
-			// console.log("Generating all moves; now @ square:", Number(sq));
 
 			allMoves.push(...this.generateMoves(row, col, legal));
 		}
@@ -352,7 +355,6 @@ export class Chess {
 
 	generateMoves(fromRow: number, fromCol: number, legal: boolean): Move[] {
 		const fromSq = squareIndex(fromRow, fromCol);
-		// console.log("Generating moves for square:", fromSq)
 
 		const movingPiece = this.getSquare(fromRow, fromCol);
 		if (movingPiece === null) return [];
@@ -372,9 +374,11 @@ export class Chess {
 		if (!legal) return pseudoLegalMoves;
 
 		return pseudoLegalMoves.filter(m => {
-			const sim = this.copy();
+			// Otherwise, simulate the move and check if it leaves us in check. If it does, it's not legal.
+			const sim = this.clone();
 			sim.makeMove(m);
 			return !sim.isInCheck(color);
+			// return !(sim.isInCheck(color) && sim.hasPiece(makePiece(PieceName.King, swapColor(color))));
 		});
 	}
 
@@ -404,21 +408,26 @@ export class Chess {
 		return { valid: true, requirePromotionDecision: false, enrichedMove: promotionMove };
 	}
 
+	/**
+	 * Checks if the given color's king is under attack by any of the opponent's pieces.
+	 * Used for move validation and check/checkmate detection.
+	 * @param color
+	 */
 	isInCheck(color: Color): boolean {
 		const kingPos = this.findKing(color);
 		if (!kingPos) return true;
 
-		const opponentColor: Color = color === Color.White ? Color.Black : Color.White;
-		return this.generateAllMoves(opponentColor, false)
-			.some(m => moveToRow(m) === kingPos.row && moveToCol(m) === kingPos.col);
+		const allMoves = this.generateAllMoves(swapColor(color), false);
+		// console.log("isInCheck()",
+		// 	allMoves.filter(m => moveToRow(m) === kingPos.row && moveToCol(m) === kingPos.col)
+		// 		.map(m => `Piece: ${this.getSquare(moveFromRow(m), moveFromCol(m))}, From: ${moveFromRow(m)}:${moveFromCol(m)}, Move: ${moveToRow(m)}:${moveToCol(m)}, TargetPiece: ${this.getSquare(moveToRow(m), moveToCol(m))}`));
+		return allMoves.some(m => moveToRow(m) === kingPos.row && moveToCol(m) === kingPos.col);
 	}
 
 	isMate(color: Color): Exclude<GameState, GameState.Draw> {
 		if (!this.hasPiece(makePiece(PieceName.King, color))) return GameState.Checkmate;
 
-		// console.log("Checking for mate by generating all possible moves for color", color);
 		const allMoves = this.generateAllMoves(color, true);
-		// console.log(allMoves)
 		if (allMoves.length === 0) {
 			return this.isInCheck(color) ? GameState.Checkmate : GameState.Stalemate;
 		}
@@ -461,7 +470,7 @@ export class Chess {
 		return { row: sq >> 3, col: sq & 7 };
 	}
 
-	copy(): Chess {
+	clone(): Chess {
 		const c = new Chess(this.numRanks, this.numFiles, this.getBoard());
 		c.currentTurn         = this.currentTurn;
 		c.moveHistory         = this.getHistory();
@@ -469,6 +478,7 @@ export class Chess {
 		c.queenSideCastleRights = { ...this.queenSideCastleRights };
 		c.gameDetails         = { ...this.gameDetails };
 		c.materialScore       = this.materialScore;
+		c.generator           = this.generator.clone();
 		return c;
 	}
 

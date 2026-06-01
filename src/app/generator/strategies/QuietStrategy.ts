@@ -5,11 +5,16 @@ import {not64} from "@/app/utils/bitUtils";
 import {allOccupancy} from "@/app/utils/bitboardHelpers";
 import {addMovesWithFlags} from "@/app/Move";
 import {MoveGeometry} from "@/app/generator/geometries/MoveGeometry";
-import {CannotCapture} from "@/app/generator/geometries/CannotCapture";
-import {CanOnlyCapture} from "@/app/generator/geometries/CanOnlyCapture";
+import {CannotCapture} from "@/app/generator/CannotCapture";
+import {CanOnlyCapture} from "@/app/generator/CanOnlyCapture";
 
 export class QuietStrategy {
 	constructor(private geometry: MoveGeometry | CannotCapture<MoveGeometry>) {}
+
+	public getGeometry(): MoveGeometry {
+		if (this.geometry instanceof CannotCapture) return this.geometry.getGeom();
+		else return this.geometry;
+	}
 
 	public capturesOnly(): CaptureStrategy {
 		return new CaptureStrategy(this.geometry);

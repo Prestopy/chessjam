@@ -13,6 +13,15 @@ export const enum PieceName {
 	King = 5,
 }
 
+export const STRING_PIECE_NAMES: Record<PieceName, string> = {
+	[PieceName.Pawn]: "Pawn",
+	[PieceName.Knight]: "Knight",
+	[PieceName.Bishop]: "Bishop",
+	[PieceName.Rook]: "Rook",
+	[PieceName.Queen]: "Queen",
+	[PieceName.King]: "King",
+}
+
 export const enum Piece {
 	WhitePawn = 0,
 	WhiteKnight = 1,

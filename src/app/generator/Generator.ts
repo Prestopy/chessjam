@@ -49,6 +49,10 @@ export class Generator {
 		this.strategies = strats;
 	}
 
+	public getStrategies() {
+		return this.strategies;
+	}
+
 	/**
 	 * Allows seamless customization out-of-the-box!
 	 * Example: generator.overrideStrategy(PieceName.Pawn, new SuperPawnStrategy());
@@ -99,6 +103,10 @@ export class Generator {
 		}
 
 		return totalMoves;
+	}
+
+	public static emptyRules(): Generator {
+		return new this(new Map());
 	}
 
 	/**
@@ -197,6 +205,52 @@ export class Generator {
 		return results;
 	}
 
+	// only mutate 1-3 pieces. The rest will have standard rules.
+	public static mutatedStandardRules(options: RandomRuleOptions): Generator {
+		const generator = this.standardRules();
+		const pieces = [PieceName.Pawn, PieceName.Knight, PieceName.Bishop, PieceName.Rook, PieceName.Queen, PieceName.King];
+		const numToMutate = Math.floor(Math.random() * 3) + 1; // Mutate between 1 and 3 pieces
+		const piecesToMutate = pieces.sort(() => 0.5 - Math.random()).slice(0, numToMutate); // Randomly select pieces to mutate
+
+		for (const piece of piecesToMutate) {
+			const forceSameCaptureAndMove = Math.random() < options.sameMoveAndCaptureGeometryChance;
+
+			// 1. Roll all modifiers for this piece
+			const modifiers = this.rollUniquePool(MODIFIER_POOL, options.modifierChance, options.multiModifierChance, (existing, next) =>
+				existing.some(m => m.constructor.name === next.constructor.name)
+			);
+
+			if (forceSameCaptureAndMove) {
+				// Roll a stack of unique geometries to apply to BOTH move and capture arrays
+				const sharedGeoms = this.rollUniquePool(GEOMETRY_POOL, 1.0, options.multiGeometryChance, (existing, next) =>
+					existing.some(g => g.getDetails().name === next.getDetails().name)
+				);
+
+				generator.overrideStrategy(piece, {
+					move: sharedGeoms.map(geom => new QuietStrategy(geom)),
+					capture: sharedGeoms.map(geom => new CaptureStrategy(geom)),
+					modifiers: modifiers.length > 0 ? modifiers : undefined
+				});
+			} else {
+				// Roll distinct stacks of unique geometries for moves vs captures separately
+				const moveGeoms = this.rollUniquePool(GEOMETRY_POOL, 1.0, options.multiGeometryChance, (existing, next) =>
+					existing.some(g => g.getDetails().name === next.getDetails().name)
+				);
+				const captureGeoms = this.rollUniquePool(GEOMETRY_POOL, 1.0, options.multiGeometryChance, (existing, next) =>
+					existing.some(g => g.getDetails().name === next.getDetails().name)
+				);
+
+				generator.overrideStrategy(piece, {
+					move: moveGeoms.map(geom => new QuietStrategy(geom)),
+					capture: captureGeoms.map(geom => new CaptureStrategy(geom)),
+					modifiers: modifiers.length > 0 ? modifiers : undefined
+				});
+			}
+		}
+
+		return generator;
+	}
+
 	public static randomizedRules(options: RandomRuleOptions): Generator {
 		const generator = new this(new Map());
 		const pieces = [PieceName.Pawn, PieceName.Knight, PieceName.Bishop, PieceName.Rook, PieceName.Queen, PieceName.King];
@@ -238,5 +292,17 @@ export class Generator {
 		}
 
 		return generator;
+	}
+
+	public clone(): Generator {
+		const newStrats = new Map<PieceName, FullStrategy>();
+		for (const [piece, strat] of this.strategies.entries()) {
+			newStrats.set(piece, {
+				move: [...strat.move],
+				capture: [...strat.capture],
+				modifiers: strat.modifiers ? [...strat.modifiers] : undefined
+			});
+		}
+		return new Generator(newStrats);
 	}
 }

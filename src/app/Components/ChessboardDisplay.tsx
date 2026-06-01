@@ -36,6 +36,12 @@ export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove,
 		setHighlights(getHighlights())
 	}, [chessboard]);
 
+	const updateHighlights = (sq?: number) => {
+		if (disable) return;
+		const newHighlights = getHighlights(sq);
+		setHighlights(newHighlights);
+	}
+
 	return (
 		<DndProvider backend={HTML5Backend}>
 			<div className="select-none">
@@ -60,6 +66,7 @@ export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove,
 											key={colIndex}
 											onMouseEnter={() => setHoveredCell({ row: rowIndex, col: colIndex })}
 											onMouseLeave={() => setHoveredCell(null)}
+											onClick={() => updateHighlights(squareIndex(rowIndex, colIndex))}
 										>
 											<Square
 												movePieceHere={(fromRow, fromCol) => {
@@ -72,11 +79,7 @@ export default function ChessboardDisplay({ squareDim, flip, chessboard, onMove,
 												white={isWhiteSquare}
 												piece={piece}
 												setIsMouseDown={setIsMouseDown}
-												onDrag={() => {
-													if (disable) return;
-													const newHighlights = getHighlights(squareIndex(rowIndex, colIndex));
-													setHighlights(newHighlights);
-												}}
+												onDrag={() => updateHighlights(squareIndex(rowIndex, colIndex))}
 												highlight={highlights.find(h => h.row === rowIndex && h.col === colIndex) ?? null}
 												disabled={disable ?? false}
 											/>

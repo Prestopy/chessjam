@@ -26,7 +26,7 @@ export default class Engine_v4 extends Engine {
 		if (allMoves.length === 0) return null; // no moves available - should be game over
 
 		const evals: Evaluation[] = allMoves.map(move => {
-			const simulatedGame = this.chessGame?.copy();
+			const simulatedGame = this.chessGame?.clone();
 			if (!simulatedGame) return { move, score: -Infinity }; // should never happen
 
 			simulatedGame.makeMove(move);

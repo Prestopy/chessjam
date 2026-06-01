@@ -3,7 +3,7 @@ import { GeneratorContext } from "@/app/generator/Generator";
 import { isDoublePushMove, moveToSq } from "@/app/Move";
 import {MoveGeometry, GeometryResult, GeometryDetails} from "@/app/generator/geometries/MoveGeometry";
 import {squareMask} from "@/app/utils/bitboardHelpers";
-import {CanOnlyCapture} from "@/app/generator/geometries/CanOnlyCapture";
+import {CanOnlyCapture} from "@/app/generator/CanOnlyCapture";
 
 export class EnPassantGeometry extends CanOnlyCapture<BaseEnPassantGeometry> {
 	getGeom() {

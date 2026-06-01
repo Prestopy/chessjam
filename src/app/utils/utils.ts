@@ -24,8 +24,8 @@ export function standardChessSetup(rank: number, file: number): Piece | null {
 		PieceName.Rook,
 		PieceName.Knight,
 		PieceName.Bishop,
-		PieceName.Queen,
 		PieceName.King,
+		PieceName.Queen,
 		PieceName.Bishop,
 		PieceName.Knight,
 		PieceName.Rook
