@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.12",
-    "next": "15.5.4",
+    "next": "15.5.21",
     "react": "19.1.0",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
